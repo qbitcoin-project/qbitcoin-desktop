@@ -1,0 +1,43 @@
+{
+  "txid": "a1b2c3d4e5f607182930414253647586a7b8c9dafbecfd0e1f2030405060708",
+  "tx_type": "standard",
+  "is_coinbase": false,
+  "received_time": null,
+  "size": 220,
+  "fee": 1000,
+  "value": 250000000,
+  "vin": [
+    {
+      "txid": "c3d4e5f607182930414253647586a7b8c9dafbecfd0e1f203040506070809a1b2",
+      "vout": 2,
+      "siglist": [
+        "01013044022076d991113643db6489a309d7a6ed940c8471b1d3b405ddbe7cda036c829f2a7d022046efce85fd1ec8176639e6b5c3a6a8d069386fcc952da7b362a0cfef27a5cb4e"
+      ],
+      "redeem_script": "2102b95c249d84f417e3e395a127425428b540671cc15881eb828c17b722a53fc599ac",
+      "prevout": {
+        "value": 300000000,
+        "scripthash": "80ef250c911adb64199bacefd8f88fcf19f39aa5",
+        "scripthash_address": "bqYnKoqdSDA61AosuvLnncxiuK9dxwUJevv"
+      }
+    }
+  ],
+  "vout": [
+    {
+      "value": 250000000,
+      "scripthash": "c30f1b5f309709d5dbe49481db2d7e8a6fb339d3",
+      "scripthash_address": "bqeoxhGky28TX5U7dRHefncn23t714M8Xmf"
+    },
+    {
+      "value": 49999000,
+      "scripthash": "18df1de7f484f0ae18a03bc80342b0fd5902b56e",
+      "scripthash_address": "bqPJ6LFVZsSnzbrPoDG5Th2zbRxKmp7vpxp"
+    }
+  ],
+  "status": {
+    "confirmed": true,
+    "block_height": 105432,
+    "block_pos": 0,
+    "block_hash": "0000000000abc123def456789012345678901234567890abcdef0123456789ab",
+    "block_time": 1716000000
+  }
+}
