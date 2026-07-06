@@ -81,8 +81,9 @@ describe('chain profile', () => {
     expect(PROFILE.messageMagic).toBe('QBitcoin Signed Message:\n')
   })
 
-  it('has no conversion flow and commits the token id since genesis', () => {
-    expect(UPGRADE).toBeNull()
+  it('has the Bitcoin upgrade configured and commits the token id since genesis', () => {
+    // Values pinned in ./upgrade.test.ts.
+    expect(UPGRADE).not.toBeNull()
     expect(DOWNGRADE).toBeNull()
     expect(PROFILE.tokenSighashFork).toEqual({ mainnet: 0, testnet: 0 })
     expect(sighashCommitsTokenId('mainnet', 0)).toBe(true)
