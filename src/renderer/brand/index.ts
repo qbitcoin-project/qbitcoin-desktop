@@ -63,5 +63,14 @@ export const brand: BrandConfig = {
   explorerTxUrl: null,
   addressPlaceholder: { mainnet: 'address…', testnet: 'address…' },
   nodeRestPort: 9557,
-  upgrade: null,
+  // QBitcoin upgrades from Bitcoin: the Convert screen is live (consensus
+  // params: the chain profile's `upgrade`), episodes link to mempool.space —
+  // the only public explorer that serves testnet4 as well.
+  upgrade: {
+    sourceCoinLabel: { mainnet: 'BTC', testnet: 'tBTC' },
+    sourceExplorerTxUrl: {
+      mainnet: 'https://mempool.space/tx/',
+      testnet: 'https://mempool.space/testnet4/tx/',
+    },
+  },
 }
