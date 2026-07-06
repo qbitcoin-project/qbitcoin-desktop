@@ -95,13 +95,33 @@ export interface UpgradeChainConfig {
   readonly fallbackFeeRate: number;
 }
 
-/**
- * Per-network upgrade parameters, keyed by the NATIVE network the wallet
- * runs on. The node derives its BTC lock script per network (mainnet
- * locks on Bitcoin mainnet, testnet on Bitcoin testnet4), so the lock
- * script — and potentially the limits — differ between the two.
- */
-export const UPGRADE: Readonly<Record<Network, UpgradeChainConfig>> | null = null;
+// QBitcoin upgrade: BTC paid into the node's per-network QBT_LOCK_SCRIPT —
+// P2PKH of hash160(QBT_LOCK_PUBKEY) — is credited as QBTC; see
+// the node's coinbase rules and chain parameters. The wallet's
+// native network maps 1:1 to the BTC side: mainnet ↔ Bitcoin mainnet,
+// testnet ↔ Bitcoin testnet4. NOTE: the node's mainnet QBT_LOCK_ADDR
+// string is a vanity value inconsistent with the script (reported); the
+// script-derived deposit addresses are
+// 1Btj5NJcNPQNKZibXoXcuJos5bMS1UspJH (mainnet) and
+// mqbtcT4awjiAjrxMyGNnbdusCdCpMkryxv (testnet).
+export const UPGRADE: Readonly<Record<Network, UpgradeChainConfig>> | null = {
+  mainnet: {
+    // hash160(QBT_LOCK_PUBKEY 03c3fe5c…19ff) = 7779983659a2908cf484e18af00cdfa34c6d0968
+    lockScriptHex: '76a9147779983659a2908cf484e18af00cdfa34c6d096888ac',
+    minConvertValue: 10_000n, // 0.0001 BTC — below this the 1% + fees make no sense
+    dustLimit: 546n,
+    feeTargetBlocks: 6,
+    fallbackFeeRate: 2,
+  },
+  testnet: {
+    // hash160(QBT_LOCK_PUBKEY 02943a59…48b6) = 6ea0436ccf2e710f75cd46bffe62ce076199e120
+    lockScriptHex: '76a9146ea0436ccf2e710f75cd46bffe62ce076199e12088ac',
+    minConvertValue: 10_000n,
+    dustLimit: 546n,
+    feeTargetBlocks: 6,
+    fallbackFeeRate: 2,
+  },
+};
 
 /**
  * SIGHASH types accepted by the protocol. The wallet only ever emits
