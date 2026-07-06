@@ -95,13 +95,32 @@ export interface UpgradeChainConfig {
   readonly fallbackFeeRate: number;
 }
 
-/**
- * Per-network upgrade parameters, keyed by the NATIVE network the wallet
- * runs on. The node derives its BTC lock script per network (mainnet
- * locks on Bitcoin mainnet, testnet on Bitcoin testnet4), so the lock
- * script — and potentially the limits — differ between the two.
- */
-export const UPGRADE: Readonly<Record<Network, UpgradeChainConfig>> | null = null;
+// QBitcoin upgrade: BTC paid into the node's per-network QBT_LOCK_SCRIPT —
+// a federated 2-of-3 P2SH-P2WSH over the operators' QBT_LOCK_PUBKEYS — is
+// credited as QBTC; see the node's coinbase rules and chain parameters.
+// The wallet's native network maps 1:1 to the BTC side: mainnet ↔ Bitcoin
+// mainnet, testnet ↔ Bitcoin testnet4. The scripts below are derived from
+// the operator pubkeys in upgrade.brand.test.ts; the deposit addresses are
+// 3QBTC3wxgSPUbKLqjZjh6aGwM3yKHWhaLU (mainnet) and
+// 2MtQBTCa85CFPFa45Tc19DmuYa3XhfSuD8D (testnet, live: the pool already
+// holds funds there).
+export const UPGRADE: Readonly<Record<Network, UpgradeChainConfig>> | null = {
+  mainnet: {
+    // OP_HASH160 hash160(OP_0 <sha256(witnessScript)>) OP_EQUAL
+    lockScriptHex: 'a914f6b3819e0774b3e2730805e9f4b55d9dc9c539f287',
+    minConvertValue: 10_000n, // 0.0001 BTC — below this the 1% + fees make no sense
+    dustLimit: 546n,
+    feeTargetBlocks: 6,
+    fallbackFeeRate: 2,
+  },
+  testnet: {
+    lockScriptHex: 'a9140ca9c0a78b49f708d18fcdd36ea47a92e1d9bbb987',
+    minConvertValue: 10_000n,
+    dustLimit: 546n,
+    feeTargetBlocks: 6,
+    fallbackFeeRate: 2,
+  },
+};
 
 /** Consensus parameters of the native→BTC downgrade (see downgrade.ts). */
 export interface DowngradeChainConfig {
