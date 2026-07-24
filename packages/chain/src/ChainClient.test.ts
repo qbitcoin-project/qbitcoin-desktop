@@ -140,20 +140,27 @@ describe('ChainClient', () => {
     });
   });
 
-  it('rejects when no endpoints configured for network', () => {
-    // testnet has no entries in DEFAULT_NODES yet, and we pass no override
-    expect(() => new ChainClient({ network: 'testnet' })).toThrow(/no endpoints/i);
+  // This build ships an empty DEFAULT_NODES (no public network yet). That must
+  // NOT be a construction error — the app has to boot so the user can add
+  // their own node in Settings. Requests fail with a ChainError until then.
+  // Brands with public nodes restore positive fallback tests in
+  // their brand tests.
+  it('constructs with zero endpoints and fails requests gracefully', async () => {
+    const client = new ChainClient({ network: 'testnet' });
+    expect(client.endpoints).toEqual([]);
+    await expect(client.getBlockchainInfo()).rejects.toMatchObject({
+      name: 'ChainError',
+      code: 'network',
+    });
+    await expect(client.broadcastTransaction('02000000')).rejects.toMatchObject({
+      name: 'ChainError',
+      code: 'broadcast_unavailable',
+    });
   });
 
-  // This build ships an empty DEFAULT_NODES (no public network yet), so the
-  // defaults fallback ends in the same "no endpoints" error. Brands
-  // with public nodes restore the positive fallback tests in their brand tests.
-  it('empty endpoints override falls back to defaults — empty in the neutral stub, so it throws', () => {
-    expect(() => new ChainClient({ network: 'mainnet', endpoints: [] })).toThrow(/no endpoints/i);
-  });
-
-  it('throws when endpoints not given and the neutral stub has no defaults', () => {
-    expect(() => new ChainClient({ network: 'mainnet' })).toThrow(/no endpoints/i);
+  it('an empty endpoints override falls back to defaults (also empty in this build)', () => {
+    expect(new ChainClient({ network: 'mainnet', endpoints: [] }).endpoints).toEqual([]);
+    expect(new ChainClient({ network: 'mainnet' }).endpoints).toEqual([]);
   });
 
   it('exposes the network it was constructed with', () => {
