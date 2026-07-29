@@ -62,13 +62,16 @@ describe('chain profile', () => {
   })
 
   it('pins the derivation schemes, ids and coin_types byte-exact', () => {
-    expect(DERIVATION_SCHEMES.map((s) => [s.id, s.status])).toEqual([['qbt-v1-placeholder', 'active']])
-    expect(activeScheme().id).toBe('qbt-v1-placeholder')
-    expect(META_V1_SCHEME_ID).toBe('qbt-v1-placeholder')
-    for (const network of NETWORKS) expect(coinTypeFor(activeScheme(), network)).toBe(1)
-    expect(nativePath(0, 0, 'mainnet')).toBe("m/44'/1'/0'/0/0")
+    // 2009 = the registered SLIP-0044 number; testnet keeps the shared BIP-44
+    // testnet coin_type 1 (also what pre-registration wallets derived from).
+    expect(DERIVATION_SCHEMES.map((s) => [s.id, s.status])).toEqual([['qbt-v1-slip44', 'active']])
+    expect(activeScheme().id).toBe('qbt-v1-slip44')
+    expect(META_V1_SCHEME_ID).toBe('qbt-v1-slip44')
+    expect(coinTypeFor(activeScheme(), 'mainnet')).toBe(2009)
+    expect(coinTypeFor(activeScheme(), 'testnet')).toBe(1)
+    expect(nativePath(0, 0, 'mainnet')).toBe("m/44'/2009'/0'/0/0")
     expect(nativePath(1, 2, 'testnet', 1)).toBe("m/44'/1'/1'/1/2")
-    expect(nativePqPath(0, 0, 'mainnet')).toBe("m/512'/1'/0'/0'/0'")
+    expect(nativePqPath(0, 0, 'mainnet')).toBe("m/512'/2009'/0'/0'/0'")
     expect(nativePqPath(1, 2, 'testnet', 1)).toBe("m/512'/1'/1'/1'/2'")
   })
 
@@ -96,14 +99,19 @@ describe('bound facade — goldens from the test mnemonic and the key 0x11…11'
       classical: 'bqhMerNwWjSQcUzcQJKuvNE9rZV4iHS3rZd',
       pqFromScripthash: '3uJULrkN8zHk2thCUZ16qUH5gxmUC5qiPe2LYi57dyjX5y7P5KL8',
       wif: '5HwoXVkHoRM8sL2KmNRS217n1g8mPPBomrY7yehCuXC1115WWsh',
-      falconSeed: 'b6dea86561688767533b3b5946927c774223ada26fdd10d8811876177c5cb569b1f0d37757a7fc07e4371afc91a56ff3',
-      falconAddress: '3uJzZBGsAheR4MGjgL1JENwaTBGDbVxPCEKJvAZpmcshrsKBUsYM',
+      // THESE VALUES FREEZE THE SCHEME: the seed at m/512'/2009'/0'/0'/0' is
+      // the input to Falcon keygen — if it moves, PQ funds stop being
+      // recoverable from their mnemonic. A failure is a derivation break to
+      // revert, not a pin to update.
+      falconSeed: 'd98741c6ffcab996c288b28fe73d311167d56e39b348290ecf51aac894290940465f2385268bfedc1e0aa481e19fc479',
+      falconAddress: '3uHLRPLv1MZEPMWqYe73rfLhgzzC35jiD1XsFhcgnveoko1pWLN4',
     },
     testnet: {
       classical: 'btqmvJWPpoj26LsmeuDGGo3PWdo3JXCtpt9Q',
       pqFromScripthash: '3ua3op5gua7tCsm7umHUtVKpawHVkomT3Cgvu6b7Pe2iYgqQAgz8u',
       wif: '91iS7EZqPeRGqPXcPiKLtbfjfLVUYYj17oQ54H3iFFw3n1UmZSS',
-      // Same leaf as mainnet: the placeholder scheme uses coin_type 1 on both networks.
+      // coin_type 1 — byte-identical to the pre-registration placeholder, which
+      // keeps wallets created before 2009 landed discoverable on testnet.
       falconSeed: 'b6dea86561688767533b3b5946927c774223ada26fdd10d8811876177c5cb569b1f0d37757a7fc07e4371afc91a56ff3',
       falconAddress: '3ua4L2QDQbqEsuDhSy4V5tEV5hVzWDBZi1HDsU3c6mfrjTjepWgBy',
     },
