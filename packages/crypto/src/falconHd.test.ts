@@ -85,13 +85,30 @@ describe('nativePqPathFor / scheme-explicit derivation', () => {
   });
 });
 
-describe('deriveFalconKeypair — HKDF stage (placeholder scheme)', () => {
-  it('HKDF stage: leaf(0,0,0) stretches to the pinned 48-byte seed', () => {
+describe('deriveFalconKeypair — HKDF stage (frozen per network)', () => {
+  // THESE VALUES FREEZE THE SCHEME. The seed at m/512'/<ct>'/0'/0'/0' is the
+  // input to Falcon keygen: if either moves, PQ funds stop being recoverable
+  // from their mnemonic. mainnet pins coin_type 2009 (SLIP-0044); testnet
+  // pins coin_type 1 — byte-identical to the pre-registration placeholder,
+  // which is what keeps wallets created before 2009 landed discoverable on
+  // testnet. A failure here is a derivation break to revert, not a test to
+  // update.
+  const PINS: ReadonlyArray<[Parameters<typeof nativePqPath>[2], string]> = [
+    [
+      'mainnet',
+      'd98741c6ffcab996c288b28fe73d311167d56e39b348290ecf51aac894290940' +
+        '465f2385268bfedc1e0aa481e19fc479',
+    ],
+    [
+      'testnet',
+      'b6dea86561688767533b3b5946927c774223ada26fdd10d8811876177c5cb569' +
+        'b1f0d37757a7fc07e4371afc91a56ff3',
+    ],
+  ];
+
+  it.each(PINS)('HKDF stage on %s: leaf(0,0,0) stretches to the frozen 48-byte seed', (network, pin) => {
     // Pins path + info label + HKDF independently of the WASM keygen.
-    // NOTE: pinned against the qbt-v1 PLACEHOLDER (coinType stand-in); it
-    // moves when the real QBitcoin coin_type lands. Brand branches pin
-    // their own frozen value plus full mnemonic → address vectors.
-    const child = derivePath(master(), nativePqPath(0, 0, 'mainnet', 0));
+    const child = derivePath(master(), nativePqPath(0, 0, network, 0));
     const seed48 = hkdf(
       nobleSha256,
       child.privateKey!,
@@ -100,10 +117,7 @@ describe('deriveFalconKeypair — HKDF stage (placeholder scheme)', () => {
       48,
     );
     expect(FALCON_HD_INFO).toBe('qbt/pq/falcon512/v1');
-    expect(toHex(seed48)).toBe(
-      'b6dea86561688767533b3b5946927c774223ada26fdd10d8811876177c5cb569' +
-        'b1f0d37757a7fc07e4371afc91a56ff3',
-    );
+    expect(toHex(seed48)).toBe(pin);
   });
 
   it('derived keys have the Falcon-512 shape', async () => {
