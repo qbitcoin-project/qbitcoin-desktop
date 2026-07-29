@@ -7,11 +7,10 @@
 // value — brand branches edit it in place. Scheme `id`s are persisted in
 // wallet storage, so a brand must never change its id once shipped.
 //
-// Why a registry instead of a single hardcoded path: SLIP-0044 (the
-// industry coin_type list) hasn't assigned these chains a number yet.
-// Until it does, we use a placeholder. When the official number lands,
-// we add a new scheme alongside the placeholder and migrate funds.
-//
+// Why a registry instead of a single hardcoded path: schemes can change
+// over a chain's lifetime (QBitcoin derived from a placeholder before
+// its SLIP-0044 number 2009 landed). A shipped scheme never leaves the
+// registry — it flips to 'legacy' and a new active one is added.
 //
 // The Falcon-512 PQ branch derives BIP-32 leaves under purpose 512'
 // (same coin_type, fully hardened) and stretches them into Falcon
@@ -91,21 +90,23 @@ export function coinTypeFor(scheme: DerivationScheme, network: Network): number 
 }
 
 /**
- * The placeholder scheme used until the chain registers an official
- * SLIP-0044 coin_type. After registration, this entry's `status` flips
- * to `'legacy'` and a new active scheme is added.
+ * The QBitcoin derivation scheme. coin_type 2009 (SLIP-0044, obtained
+ * 2026-07) on mainnet; testnet follows the BIP-44 convention with the
+ * shared testnet coin_type 1 — which also keeps wallets created before
+ * registration discoverable there (the placeholder derived everything
+ * from coin_type 1). No wallet ever shipped deriving mainnet funds from
+ * the placeholder, so there is no legacy scheme to carry.
  *
- * TODO(qbitcoin): the QBitcoin coin_type is being obtained; coinType 1
- * (SLIP-0044 "testnet, all coins") is a stand-in until then. Do NOT ship
- * a release that derives real funds from this scheme.
+ * FROZEN once shipped: id, coin_types and the path shape hold user
+ * funds — never change them; add a new scheme instead.
  */
-export const SCHEME_QBT_PLACEHOLDER: DerivationScheme = {
-  id: 'qbt-v1-placeholder',
-  coinType: 1,
-  label: 'QBitcoin v1 (pre-SLIP-0044)',
+export const SCHEME_QBT: DerivationScheme = {
+  id: 'qbt-v1-slip44',
+  coinType: { mainnet: 2009, testnet: 1 },
+  label: 'QBitcoin v1 (SLIP-0044)',
   status: 'active',
-  pathTemplate: (account, change, index, _network) =>
-    `m/44'/1'/${account}'/${change}/${index}`,
+  pathTemplate: (account, change, index, network) =>
+    `m/44'/${coinTypeFor(SCHEME_QBT, network)}'/${account}'/${change}/${index}`,
 };
 
 /**
@@ -120,7 +121,7 @@ export const SCHEME_QBT_PLACEHOLDER: DerivationScheme = {
  * `activeScheme()` helper enforces this at runtime.
  */
 export const DERIVATION_SCHEMES: readonly DerivationScheme[] = [
-  SCHEME_QBT_PLACEHOLDER,
+  SCHEME_QBT,
 ];
 
 /**
@@ -170,7 +171,7 @@ export function requireScheme(id: string): DerivationScheme {
  * blobs on disk were written under it, and re-attributing them would shift
  * issued-index floors onto the wrong branch.
  */
-export const META_V1_SCHEME_ID: string = SCHEME_QBT_PLACEHOLDER.id;
+export const META_V1_SCHEME_ID: string = SCHEME_QBT.id;
 
 // ─── Convenience aliases ──────────────────────────────────────────────
 
