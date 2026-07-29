@@ -3,7 +3,7 @@ import {
   coinTypeFor,
   DERIVATION_SCHEMES,
   META_V1_SCHEME_ID,
-  SCHEME_QBT_PLACEHOLDER,
+  SCHEME_QBT,
   activeScheme,
   derivePath,
   nativePath,
@@ -80,23 +80,24 @@ describe('derivation scheme registry', () => {
     expect(actives.length).toBe(1);
   });
 
-  it('activeScheme() returns the placeholder', () => {
-    expect(activeScheme().id).toBe('qbt-v1-placeholder');
-    expect(activeScheme().coinType).toBe(1);
+  it('activeScheme() returns the SLIP-0044 scheme', () => {
+    expect(activeScheme().id).toBe('qbt-v1-slip44');
+    expect(coinTypeFor(activeScheme(), 'mainnet')).toBe(2009);
+    expect(coinTypeFor(activeScheme(), 'testnet')).toBe(1);
   });
 
-  it('exposes the placeholder via SCHEME_QBT_PLACEHOLDER', () => {
-    expect(SCHEME_QBT_PLACEHOLDER.id).toBe('qbt-v1-placeholder');
-    expect(SCHEME_QBT_PLACEHOLDER.coinType).toBe(1);
-    expect(SCHEME_QBT_PLACEHOLDER.status).toBe('active');
+  it('exposes the scheme via SCHEME_QBT', () => {
+    expect(SCHEME_QBT.id).toBe('qbt-v1-slip44');
+    expect(SCHEME_QBT.coinType).toEqual({ mainnet: 2009, testnet: 1 });
+    expect(SCHEME_QBT.status).toBe('active');
   });
 
   it('legacySchemes() is empty', () => {
     expect(legacySchemes()).toEqual([]);
   });
 
-  it('schemeById finds the placeholder', () => {
-    expect(schemeById('qbt-v1-placeholder')?.coinType).toBe(1);
+  it('schemeById finds the scheme', () => {
+    expect(schemeById('qbt-v1-slip44')).toBe(SCHEME_QBT);
   });
 
   it('schemeById returns undefined for unknown ids', () => {
@@ -104,7 +105,7 @@ describe('derivation scheme registry', () => {
   });
 
   it('requireScheme returns known schemes and throws on unknown ids', () => {
-    expect(requireScheme('qbt-v1-placeholder')).toBe(SCHEME_QBT_PLACEHOLDER);
+    expect(requireScheme('qbt-v1-slip44')).toBe(SCHEME_QBT);
     expect(() => requireScheme('nope')).toThrow(/Unknown derivation scheme/);
   });
 
@@ -113,12 +114,14 @@ describe('derivation scheme registry', () => {
   // tags) and its paths hold user funds. Removing or renaming it would make
   // those funds invisible. When a real coin_type lands, it flips to
   // 'legacy' — it never leaves.
-  it('keeps the v1 scheme registered forever, id byte-exact', () => {
-    const v1 = DERIVATION_SCHEMES.find((s) => s.id === 'qbt-v1-placeholder');
+  it('keeps the v1 scheme registered forever, id and coin_types byte-exact', () => {
+    const v1 = DERIVATION_SCHEMES.find((s) => s.id === 'qbt-v1-slip44');
     expect(v1).toBeDefined();
-    expect(v1!.coinType).toBe(1);
-    // Path shape frozen — coin_type level must match the scheme's coinType.
-    expect(v1!.pathTemplate(0, 0, 0, 'mainnet')).toBe("m/44'/1'/0'/0/0");
+    // Frozen values: 2009 = the registered SLIP-0044 number, 1 = the shared
+    // BIP-44 testnet coin_type (also what pre-registration wallets used).
+    expect(coinTypeFor(v1!, 'mainnet')).toBe(2009);
+    expect(coinTypeFor(v1!, 'testnet')).toBe(1);
+    expect(v1!.pathTemplate(0, 0, 0, 'mainnet')).toBe("m/44'/2009'/0'/0/0");
     expect(v1!.pathTemplate(0, 0, 0, 'testnet')).toBe("m/44'/1'/0'/0/0");
   });
 
@@ -133,7 +136,7 @@ describe('derivation scheme registry', () => {
 
   it('META_V1_SCHEME_ID names a registered scheme (owner of pre-v2 blobs)', () => {
     expect(schemeById(META_V1_SCHEME_ID)).toBeDefined();
-    expect(META_V1_SCHEME_ID).toBe('qbt-v1-placeholder');
+    expect(META_V1_SCHEME_ID).toBe('qbt-v1-slip44');
   });
 });
 
@@ -184,7 +187,7 @@ describe('nativePath', () => {
 
   it('matches the active scheme pathTemplate output', () => {
     expect(nativePath(2, 7, 'mainnet', 1)).toBe(
-      SCHEME_QBT_PLACEHOLDER.pathTemplate(2, 1, 7, 'mainnet'),
+      SCHEME_QBT.pathTemplate(2, 1, 7, 'mainnet'),
     );
   });
 });
@@ -203,8 +206,10 @@ describe('coinTypeFor — per-network coin_type', () => {
   };
 
   it('a plain number applies to every network', () => {
-    expect(coinTypeFor(SCHEME_QBT_PLACEHOLDER, 'mainnet')).toBe(1);
-    expect(coinTypeFor(SCHEME_QBT_PLACEHOLDER, 'testnet')).toBe(1);
+    // (On this brand the fake below covers the record case; the plain-number
+    // case is covered by the 7777 fake above.)
+    expect(coinTypeFor({ ...SCHEME_QBT, coinType: 7 }, 'mainnet')).toBe(7);
+    expect(coinTypeFor({ ...SCHEME_QBT, coinType: 7 }, 'testnet')).toBe(7);
   });
 
   it('a record resolves per network, and the path follows it', () => {
