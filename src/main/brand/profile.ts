@@ -1,4 +1,4 @@
-import type { ChainProfile, DerivationScheme } from '@qbtc/crypto'
+import { coinTypeFor, type ChainProfile, type DerivationScheme } from '@qbtc/crypto'
 
 // The chain profile: everything that makes this build's chain THIS chain from
 // the wallet-crypto perspective — derivation schemes, address magic, WIF
@@ -7,7 +7,7 @@ import type { ChainProfile, DerivationScheme } from '@qbtc/crypto'
 // binds it into the facade the rest of main imports.
 //
 // BRAND FILE: like the node's chain parameters, brand branches edit these
-// values in place. The common base carries the QBitcoin network parameters.
+// values in place. This is the QBitcoin brand.
 //
 // FROZEN on a shipped brand: every value here except the `upgrade` display
 // limits is consensus- or storage-affecting — changing schemes, magic, HKDF
@@ -15,22 +15,23 @@ import type { ChainProfile, DerivationScheme } from '@qbtc/crypto'
 // tests: tests/unit/brand/profile.test.ts.
 
 /**
- * The placeholder scheme used until the chain registers an official
- * SLIP-0044 coin_type. After registration, this entry's `status` flips to
- * `'legacy'` and a new active scheme is added — it stays registered forever
- * so funds derived under it remain discoverable.
+ * The QBitcoin derivation scheme. coin_type 2009 (SLIP-0044, obtained
+ * 2026-07) on mainnet; testnet follows the BIP-44 convention with the
+ * shared testnet coin_type 1 — which also keeps wallets created before
+ * registration discoverable there (the placeholder derived everything
+ * from coin_type 1). No wallet ever shipped deriving mainnet funds from
+ * the placeholder, so there is no legacy scheme to carry.
  *
- * TODO(qbitcoin): the QBitcoin coin_type is being obtained; coinType 1
- * (SLIP-0044 "testnet, all coins") is a stand-in until then. Do NOT ship a
- * release that derives real funds from this scheme.
+ * FROZEN once shipped: id, coin_types and the path shape hold user
+ * funds — never change them; add a new scheme instead.
  */
-export const SCHEME_QBT_PLACEHOLDER: DerivationScheme = {
-  id: 'qbt-v1-placeholder',
-  coinType: 1,
-  label: 'QBitcoin v1 (pre-SLIP-0044)',
+export const SCHEME_QBT: DerivationScheme = {
+  id: 'qbt-v1-slip44',
+  coinType: { mainnet: 2009, testnet: 1 },
+  label: 'QBitcoin v1 (SLIP-0044)',
   status: 'active',
-  pathTemplate: (account, change, index, _network) =>
-    `m/44'/1'/${account}'/${change}/${index}`,
+  pathTemplate: (account, change, index, network) =>
+    `m/44'/${coinTypeFor(SCHEME_QBT, network)}'/${account}'/${change}/${index}`,
 }
 
 export const PROFILE: ChainProfile = {
@@ -66,7 +67,7 @@ export const PROFILE: ChainProfile = {
    * Every derivation scheme this chain's wallets know about, in scan
    * priority order for funds discovery. Exactly one is 'active'.
    */
-  schemes: [SCHEME_QBT_PLACEHOLDER],
+  schemes: [SCHEME_QBT],
 
   /**
    * The scheme that owns data persisted BEFORE storage became per-scheme
@@ -75,7 +76,7 @@ export const PROFILE: ChainProfile = {
    * re-attributing old blobs would shift issued-index floors onto the wrong
    * branch.
    */
-  metaV1SchemeId: SCHEME_QBT_PLACEHOLDER.id,
+  metaV1SchemeId: SCHEME_QBT.id,
 
   /** HKDF label of the Falcon-512 keygen-seed derivation. Versioned. */
   falconHdInfo: 'qbt/pq/falcon512/v1',
