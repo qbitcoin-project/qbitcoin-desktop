@@ -46,7 +46,7 @@ export {
   HARDENED,
   HDKey,
   META_V1_SCHEME_ID,
-  SCHEME_QBT_PLACEHOLDER,
+  SCHEME_QBT,
   activeScheme,
   derivePath,
   nativePath,
