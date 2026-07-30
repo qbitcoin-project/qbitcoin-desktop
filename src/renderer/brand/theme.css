@@ -10,20 +10,23 @@
    near-black / white reads better on that fill — a light accent needs a dark
    label, and the two brands legitimately differ here.
 
-   The common base ships a deliberately unbranded steel accent: any vivid colour
-   here would read as somebody's brand. */
+   QBitcoin's accent is the orange of the logo's gradient. On the dark theme it
+   reads 6.6:1 as text on --bg, and its button takes a near-black label (white
+   would be 2.8:1). The light theme cannot use the same orange — 2.2:1 on white
+   — so it is darkened until accent text clears 4.5:1, and the label goes white
+   again. */
 :root {
-  --primary: #6d8ea8;
-  --primary-h: #5e7f98;
-  --primary-p: #507089;
-  --primary-soft: #0b283c;
+  --primary: #fd7007;
+  --primary-h: #e5650b;
+  --primary-p: #ce5b0a;
+  --primary-soft: #391d0e;
   --on-primary: #131311;
 }
 
 [data-theme="light"] {
-  --primary: #5c7a92;
-  --primary-h: #4e6b83;
-  --primary-p: #436077;
-  --primary-soft: #e5f2fb;
+  --primary: #c2560d;
+  --primary-h: #ac4b07;
+  --primary-p: #9b4307;
+  --primary-soft: #fbece5;
   --on-primary: #ffffff;
 }
