@@ -5,10 +5,26 @@ import { nodesFor, type Network, type NodeEndpoint } from '@qbtc/chain'
 // list lives here and is handed to the chain client at startup.
 //
 // BRAND FILE: the endpoint list is a brand value — each brand branch fills in
-// its own public nodes. The common base ships none (the network may not be
-// launched yet); the wallet then requires a self-hosted node in Settings.
+// its own public nodes. QBitcoin ships the project's public Esplora node for
+// both networks; users can still add their own in Settings.
 export const DEFAULT_NODES: readonly NodeEndpoint[] = [
-  // Brand branches append their public Esplora / JSON-RPC nodes here.
+  {
+    name: 'qbitcoin.net',
+    url: 'https://api.qbitcoin.net',
+    protocol: 'esplora',
+    network: 'mainnet',
+    operator: 'QBitcoin Project',
+    priority: 1,
+  },
+  {
+    name: 'qbitcoin.net',
+    url: 'https://api-testnet.qbitcoin.net',
+    protocol: 'esplora',
+    network: 'testnet',
+    operator: 'QBitcoin Project',
+    priority: 1,
+  },
+  // Future community-run Esplora nodes append here.
 ]
 
 /** The bundled endpoints serving `network`, sorted by priority. */
