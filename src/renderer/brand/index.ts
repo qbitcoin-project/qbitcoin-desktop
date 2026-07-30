@@ -54,14 +54,17 @@ export interface BrandConfig {
   } | null
 }
 
-// Neutral stub — brand branches override these values in their own stack.
 export const brand: BrandConfig = {
-  assetLabel: { mainnet: 'COIN', testnet: 'tCOIN' },
-  assetName: 'Blockchain',
-  productName: 'Wallet',
-  tagline: "A quantum-safe home for your coins. Let's set up your wallet.",
+  assetLabel: { mainnet: 'QBTC', testnet: 'tQBTC' },
+  assetName: 'QBitcoin',
+  productName: 'QBitcoin Wallet',
+  tagline: "A quantum-safe home for your QBitcoin. Let's set up your wallet.",
+  // No public explorer yet — the UI hides explorer links until there is one.
   explorerTxUrl: null,
-  addressPlaceholder: { mainnet: 'address…', testnet: 'address…' },
+  // Both address shapes the chain accepts, per network: classical (HASH160,
+  // 35/36 chars) and post-quantum (HASH256, 52/53). Prefixes follow the
+  // node's per-network ADDRESS_RE.
+  addressPlaceholder: { mainnet: 'bq… or 3u…', testnet: 'btq… or 3ua…' },
   nodeRestPort: 9557,
   // QBitcoin upgrades from Bitcoin: the Convert screen is live (consensus
   // params: the chain profile's `upgrade`), episodes link to mempool.space —
