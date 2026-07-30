@@ -30,7 +30,23 @@ export interface NodeEndpoint {
 }
 
 export const DEFAULT_NODES: readonly NodeEndpoint[] = [
-  // Brand branches append their public Esplora / JSON-RPC nodes here.
+  {
+    name: 'qbitcoin.net',
+    url: 'https://api.qbitcoin.net',
+    protocol: 'esplora',
+    network: 'mainnet',
+    operator: 'QBitcoin Project',
+    priority: 1,
+  },
+  {
+    name: 'qbitcoin.net',
+    url: 'https://api-testnet.qbitcoin.net',
+    protocol: 'esplora',
+    network: 'testnet',
+    operator: 'QBitcoin Project',
+    priority: 1,
+  },
+  // Future community-run Esplora nodes append here.
 ];
 
 /** Subset of DEFAULT_NODES for a given network, sorted by priority. */
