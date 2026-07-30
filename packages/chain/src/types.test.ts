@@ -67,8 +67,10 @@ describe('balanceOf', () => {
 });
 
 describe('DEFAULT_NODES + nodesFor', () => {
-  // This build ships no default endpoints (brands add theirs
-  // and restore an "at least one entry" assertion in their brand tests).
+  it('ships a default endpoint for both networks', () => {
+    expect(nodesFor('mainnet').length).toBeGreaterThan(0);
+    expect(nodesFor('testnet').length).toBeGreaterThan(0);
+  });
 
   it('all default entries use HTTPS', () => {
     for (const node of DEFAULT_NODES) {

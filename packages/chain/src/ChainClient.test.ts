@@ -140,27 +140,24 @@ describe('ChainClient', () => {
     });
   });
 
-  // This build ships an empty DEFAULT_NODES (no public network yet). That must
-  // NOT be a construction error — the app has to boot so the user can add
-  // their own node in Settings. Requests fail with a ChainError until then.
-  // Brands with public nodes restore positive fallback tests in
-  // their brand tests.
-  it('constructs with zero endpoints and fails requests gracefully', async () => {
-    const client = new ChainClient({ network: 'testnet' });
-    expect(client.endpoints).toEqual([]);
-    await expect(client.getBlockchainInfo()).rejects.toMatchObject({
-      name: 'ChainError',
-      code: 'network',
-    });
-    await expect(client.broadcastTransaction('02000000')).rejects.toMatchObject({
-      name: 'ChainError',
-      code: 'broadcast_unavailable',
-    });
+  // This brand ships a public node for BOTH networks, so the zero-endpoint
+  // boot path cannot be constructed here. What matters is that every
+  // network resolves to a default of its own.
+  it('falls back to DEFAULT_NODES when endpoints is an empty array', () => {
+    // [] means "no override given" — fall back to the network's defaults.
+    for (const network of ['mainnet', 'testnet'] as const) {
+      const client = new ChainClient({ network, endpoints: [] });
+      expect(client.endpoints.length).toBeGreaterThan(0);
+      for (const e of client.endpoints) expect(e.network).toBe(network);
+    }
   });
 
-  it('an empty endpoints override falls back to defaults (also empty in this build)', () => {
-    expect(new ChainClient({ network: 'mainnet', endpoints: [] }).endpoints).toEqual([]);
-    expect(new ChainClient({ network: 'mainnet' }).endpoints).toEqual([]);
+  it('falls back to DEFAULT_NODES for the network when endpoints are not given', () => {
+    for (const network of ['mainnet', 'testnet'] as const) {
+      const client = new ChainClient({ network });
+      expect(client.endpoints.length).toBeGreaterThan(0);
+      expect(client.endpoints[0]!.network).toBe(network);
+    }
   });
 
   it('exposes the network it was constructed with', () => {
