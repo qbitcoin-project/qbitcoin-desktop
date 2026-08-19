@@ -621,3 +621,31 @@ describe('EsploraClient — special transaction types', () => {
     expect(tx.vout[0]!.tokenAmount).toBe(18446744073709551615n);
   });
 });
+
+describe('EsploraClient — cumulative sums beyond uint64', () => {
+  it('accepts the float form a heavy staking address produces', async () => {
+    // Wire bytes of an address whose cumulative sums passed uint64: the
+    // node serializes such sums as doubles.
+    const body = '{"tokens":{},"chain_stats":{"spent_txo_sum":1.1e+21,"tx_count":400000,' +
+      '"funded_txo_sum":1.2e+21,"funded_txo_count":400000,"spent_txo_count":399999},' +
+      '"mempool_stats":{"funded_txo_count":0,"tx_count":0,"spent_txo_sum":0,"funded_txo_sum":0,"spent_txo_count":0}}';
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(body, { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    );
+    const info = await makeClient(fetchImpl).getAddressInfo('bqaMhNjnrmiuJWjSY4SgynLZ8wcSrjaiwRB');
+    expect(info.chain.fundedSum).toBe(BigInt(1.2e21));
+    expect(info.chain.fundedSum > 2n ** 64n).toBe(true);
+    expect(info.chain.fundedSum - info.chain.spentSum > 0n).toBe(true);
+  });
+
+  it('still rejects a float where a transaction value must be exact', async () => {
+    const raw = [{
+      txid: 'a'.repeat(64), vout: 0, value: 0.5,
+      status: 'confirmed', height: 10,
+    }];
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(raw));
+    await expect(makeClient(fetchImpl).listUnspent('bq...')).rejects.toMatchObject({
+      code: 'malformed_response',
+    });
+  });
+});
