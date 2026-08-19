@@ -81,10 +81,10 @@ describe('chain profile', () => {
     expect(PROFILE.messageMagic).toBe('QBitcoin Signed Message:\n')
   })
 
-  it('has the Bitcoin upgrade configured and commits the token id since genesis', () => {
-    // Values pinned in ./upgrade.test.ts.
+  it('has both conversion directions configured and commits the token id since genesis', () => {
+    // Values pinned in ./upgrade.test.ts and ./downgrade.test.ts.
     expect(UPGRADE).not.toBeNull()
-    expect(DOWNGRADE).toBeNull()
+    expect(DOWNGRADE).not.toBeNull()
     expect(PROFILE.tokenSighashFork).toEqual({ mainnet: 0, testnet: 0 })
     expect(sighashCommitsTokenId('mainnet', 0)).toBe(true)
     expect(sighashCommitsTokenId('testnet', 1)).toBe(true)
