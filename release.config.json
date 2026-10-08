@@ -1,9 +1,14 @@
 {
   "schemaVersion": 1,
-  "brand": null,
-  "releaseBranch": null,
-  "tagPrefix": null,
-  "packageName": null,
-  "productName": null,
-  "aliases": []
+  "brand": "qbitcoin",
+  "releaseBranch": "qbitcoin",
+  "tagPrefix": "qbtc-v",
+  "packageName": "qbitcoin-wallet-desktop",
+  "productName": "QBitcoin Wallet",
+  "aliases": [
+    "QBitcoin",
+    "QBT",
+    "QBTC",
+    "qbitcoin.net"
+  ]
 }
