@@ -59,8 +59,7 @@ export const brand: BrandConfig = {
   assetName: 'QBitcoin',
   productName: 'QBitcoin Wallet',
   tagline: "A quantum-safe home for your QBitcoin. Let's set up your wallet.",
-  // No public explorer yet — the UI hides explorer links until there is one.
-  explorerTxUrl: null,
+  explorerTxUrl: 'https://qbtcscan.org/tx/',
   // Both address shapes the chain accepts, per network: classical (HASH160,
   // 35/36 chars) and post-quantum (HASH256, 52/53). Prefixes follow the
   // node's per-network ADDRESS_RE.
