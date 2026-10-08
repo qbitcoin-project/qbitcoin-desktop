@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.0 — 2026-10-08
+
+### Added
+
+- Read release notes inside the wallet, even offline or before unlocking, from What’s new in the sidebar or Help menu.
+- Open transaction details on qbtcscan.org using the Explorer button.
+
+### Fixed
+
+- Transaction history and details now load for wallets receiving staking rewards. Staking rewards are shown separately from transaction fees.
+
 ## 1.3.0 — 2026-09-29
 
 Safer backups, more control over sensitive information, and a smoother wallet setup.

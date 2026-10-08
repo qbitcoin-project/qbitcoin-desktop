@@ -1,1 +1,30 @@
-null
+{
+  "version": "1.4.0",
+  "date": "2026-10-08",
+  "tag": "qbtc-v1.4.0",
+  "origin": "notes",
+  "changes": [
+    {
+      "id": "changelog-viewer",
+      "hash": "6df05a065ba85c8a88cc297f6f1320db6bb55ba2c2be4174670cf4336fc18530"
+    },
+    {
+      "id": "local-release-tools",
+      "hash": "822ded8374fa41ad3afe28b1a71486a684dace79f2a0044fb1ed60bfe9a0bd1e"
+    },
+    {
+      "id": "release-workflow",
+      "hash": "2e94fa47105625382cab02d21caf1a27e8467f39c202d1381c9ddc8a8f78bada"
+    },
+    {
+      "id": "staking-history",
+      "hash": "bce851ca22a6ea611db18e845bbbe7d14bde98faf0c55835c7dad5463294c729"
+    },
+    {
+      "id": "transaction-explorer",
+      "hash": "511146a4d587fc709e2cafbfcdac21f53b4ed95c14a786195d5ddab365d7ba46"
+    }
+  ],
+  "body": "### Added\n\n- Read release notes inside the wallet, even offline or before unlocking, from What’s new in the sidebar or Help menu.\n- Open transaction details on qbtcscan.org using the Explorer button.\n\n### Fixed\n\n- Transaction history and details now load for wallets receiving staking rewards. Staking rewards are shown separately from transaction fees.",
+  "sourceDigest": "b6320b58c73e6e4de5fdec64987608559b81a01cadd8379ca4b18fa1d7eabe25"
+}
