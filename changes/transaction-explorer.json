@@ -1,0 +1,7 @@
+{
+  "id": "transaction-explorer",
+  "scope": "qbitcoin",
+  "type": "added",
+  "bump": "minor",
+  "text": "Open transaction details on qbtcscan.org using the Explorer button."
+}
