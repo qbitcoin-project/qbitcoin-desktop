@@ -6,6 +6,7 @@ const token = { id: 'token-test', name: 'Test Token', symbol: 'TOK', decimals: 2
 const wallets = [{ id: 'main', label: 'Main Wallet', kind: query.has('key') ? 'key' : 'seed', active: true, canSign: true, removable: false, address }]
 if (query.has('accounts')) wallets.push({ id: 'imported', label: 'Imported key', kind: 'key', active: false, canSign: true, removable: true, address: 'single-key-test-address' })
 const calls = []
+const transaction = { txid: 'ab'.repeat(32), direction: 'in', amountAtomic: '100000000', feeAtomic: '1000', confirmed: true, blockTime: 1700000000 }
 window.walletUiTest = { calls, depositAvailable: true }
 const methods = {
   getNode: () => ({ network: 'mainnet', selected: 'public', publicNodes: [], customNodes: [], tor: false, hasAuth: false }),
@@ -13,7 +14,10 @@ const methods = {
   getSnapshot: () => null,
   listWallets: () => wallets,
   getSummary: () => ({ balanceAtomic: '100000000', addressCount: 1 }),
-  getHistory: () => ({ items: [], hasMore: false }),
+  getHistory: () => ({ items: query.has('notes') ? [{ ...transaction }] : [], hasMore: false }),
+  getTxDetail: () => ({ txid: transaction.txid, confirmations: 10, sizeBytes: 200, totalInAtomic: '100001000', totalOutAtomic: '100000000', feeAtomic: '1000', inputs: [], outputs: [] }),
+  setTxLabel: (_txid, label) => { transaction.label = label || undefined },
+  setCoinLabel: () => {},
   listContacts: () => [],
   listTokens: () => [token],
   listCoins: () => [coin, { ...coin, outpoint: 'bb:0', valueAtomic: '900000000', frozen: true }],

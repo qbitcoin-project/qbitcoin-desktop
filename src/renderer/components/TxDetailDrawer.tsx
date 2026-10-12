@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { AddressAlgo, HistoryItem, TxDetail, TxIoEntry } from '../../shared/protocol'
 import { brand } from '../brand'
 import { formatNative, formatToken, historyAmount, shortHash, tokenLabels, transactionFeeDisplay } from '../lib/format'
 import { useAdvancedMode } from '../lib/prefs'
 import { disassembleScript } from '../lib/script'
 import { assetLabelFor } from '../brand/labels'
-import { loadTxDetail, loadTxRaw, saveTxLabel, useAssetLabel, useBuildNetwork, useTokens } from '../lib/walletData'
+import { loadTxDetail, loadTxRaw, saveTxLabel, useAssetLabel, useBuildNetwork, useHistory, useTokens } from '../lib/walletData'
 import { ChevDownIcon, CloseIcon, CopyIcon, CopyValue, ExternalIcon, LabelInput, PencilIcon } from '../ui'
 import { TxTypeBadge } from './TxTypeBadge'
 
@@ -21,6 +21,14 @@ export function TxDetailDrawer({ tx, onClose }: { tx: HistoryItem; onClose: () =
   const [detail, setDetail] = useState<TxDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
+  const noteButton = useRef<HTMLButtonElement>(null)
+  const noteId = useId()
+  const noteHintId = useId()
+  // The drawer's opening snapshot stays the same while the shared history cache
+  // updates. Read the current note so saved edits (and failed-write rollbacks)
+  // appear here immediately as well as in the activity list.
+  const { data: history } = useHistory()
+  const note = (history?.items.find((item) => item.txid === tx.txid) ?? tx).label
   const [copied, setCopied] = useState(false)
   const advanced = useAdvancedMode()
   // For labelling amounts and upgrade-coinbase provenance with the right
@@ -49,7 +57,7 @@ export function TxDetailDrawer({ tx, onClose }: { tx: HistoryItem; onClose: () =
   // Esc closes the drawer.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && !e.defaultPrevented && !e.isComposing) onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -124,30 +132,35 @@ export function TxDetailDrawer({ tx, onClose }: { tx: HistoryItem; onClose: () =
 
           {/* Label */}
           <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-500)', marginBottom: 7 }}>Label</div>
+            <div id={noteId} style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-500)', marginBottom: 7 }}>Transaction note</div>
             {editing ? (
               <LabelInput
-                defaultValue={tx.label ?? ''}
+                defaultValue={note ?? ''}
                 onCommit={(value) => {
                   setEditing(false)
                   saveTxLabel(tx.txid, value)
                 }}
-                placeholder="Add a label"
-                aria-label="Transaction label"
+                onCancel={() => { setEditing(false); requestAnimationFrame(() => noteButton.current?.focus()) }}
+                placeholder="Add transaction note"
+                aria-labelledby={noteId}
+                aria-describedby={noteHintId}
                 style={{ height: 40, padding: '0 12px' }}
               />
             ) : (
               <button
                 type="button"
+                ref={noteButton}
+                aria-describedby={noteHintId}
                 onClick={() => setEditing(true)}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', height: 40, padding: '0 12px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--well)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
               >
-                <span style={{ flex: 1, fontSize: 14, color: tx.label !== undefined ? 'var(--ink-900)' : 'var(--ink-500)' }}>{tx.label ?? 'Add a label'}</span>
+                <span style={{ flex: 1, fontSize: 14, color: note !== undefined ? 'var(--ink-900)' : 'var(--ink-500)' }}>{note ?? 'Add transaction note'}</span>
                 <span style={{ display: 'flex', color: 'var(--ink-500)' }}>
                   <PencilIcon size={14} />
                 </span>
               </button>
             )}
+            <div id={noteHintId} className="field-hint">Only visible in this wallet.{editing && ' Enter to save · Esc to cancel'}</div>
           </div>
 
           {/* Flow: inputs / outputs */}

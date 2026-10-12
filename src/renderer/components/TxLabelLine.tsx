@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useId, useRef, useState, type ReactNode } from 'react'
 import type { HistoryItem } from '../../shared/protocol'
 import { saveTxLabel } from '../lib/walletData'
 import { LabelInput, PencilIcon } from '../ui'
@@ -15,6 +15,8 @@ import { TxTypeBadge } from './TxTypeBadge'
 // bubbling so editing inside a clickable row doesn't also trigger the row.
 export function TxLabelLine({ tx, sub }: { tx: HistoryItem; sub: ReactNode }) {
   const [editing, setEditing] = useState(false)
+  const editButton = useRef<HTMLButtonElement>(null)
+  const hintId = useId()
   const fallback = tx.direction === 'in' ? 'Received' : 'Sent'
 
   function save(value: string): void {
@@ -24,15 +26,20 @@ export function TxLabelLine({ tx, sub }: { tx: HistoryItem; sub: ReactNode }) {
 
   if (editing) {
     return (
-      <LabelInput
-        compact
-        defaultValue={tx.label ?? ''}
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-        onCommit={save}
-        placeholder="Add label"
-        aria-label="Transaction label"
-      />
+      <div>
+        <LabelInput
+          compact
+          defaultValue={tx.label ?? ''}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          onCommit={save}
+          onCancel={() => { setEditing(false); requestAnimationFrame(() => editButton.current?.focus()) }}
+          placeholder="Add transaction note"
+          aria-label="Transaction note"
+          aria-describedby={hintId}
+        />
+        <div id={hintId} className="field-hint">Local note · Enter to save · Esc to cancel</div>
+      </div>
     )
   }
   return (
@@ -42,13 +49,15 @@ export function TxLabelLine({ tx, sub }: { tx: HistoryItem; sub: ReactNode }) {
         <TxTypeBadge txType={tx.txType} />
         <button
           type="button"
+          ref={editButton}
           className="coin-pencil"
           onClick={(e) => {
             e.stopPropagation()
             setEditing(true)
           }}
-          title="Edit label"
-          aria-label="Edit label"
+          onKeyDown={(e) => e.stopPropagation()}
+          title="Edit transaction note"
+          aria-label="Edit transaction note"
           style={{ flex: 'none', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', borderRadius: 6, cursor: 'pointer', color: 'var(--ink-500)' }}
         >
           <PencilIcon size={13} />

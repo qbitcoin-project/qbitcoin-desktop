@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import type { UtxoView } from '../../shared/protocol'
 import { formatNative, formatToken, tokenLabels } from '../lib/format'
 import { wallet } from '../lib/wallet'
@@ -239,6 +239,7 @@ function CoinRow({
   onToggleFreeze: () => void
 }) {
   const [editing, setEditing] = useState(false)
+  const editButton = useRef<HTMLButtonElement>(null)
   const asset = useAssetLabel()
   const pq = coin.algo === 'falcon512'
   const primary = coin.label ?? coin.address
@@ -268,6 +269,7 @@ function CoinRow({
               onLabel(value)
               setEditing(false)
             }}
+            onCancel={() => { setEditing(false); requestAnimationFrame(() => editButton.current?.focus()) }}
             placeholder="Add label"
             aria-label="Coin label"
             style={{ background: 'var(--card-el)' }}
@@ -276,7 +278,7 @@ function CoinRow({
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
               <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink-900)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 240 }}>{primary}</span>
-              <button type="button" className="coin-pencil" onClick={() => setEditing(true)} title="Edit label" aria-label="Edit label" style={{ flex: 'none', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', borderRadius: 6, cursor: 'pointer', color: 'var(--ink-500)' }}>
+              <button type="button" ref={editButton} className="coin-pencil" onClick={() => setEditing(true)} title="Edit label" aria-label="Edit label" style={{ flex: 'none', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', borderRadius: 6, cursor: 'pointer', color: 'var(--ink-500)' }}>
                 <PencilIcon size={13} />
               </button>
               {coin.frozen && (

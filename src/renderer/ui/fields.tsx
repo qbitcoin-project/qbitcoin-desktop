@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type AriaAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react'
+import { useEffect, useId, useRef, useState, type AriaAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react'
 import { EyeIcon, EyeOffIcon } from './icons'
 
 export type FieldState = 'default' | 'error' | 'success'
@@ -125,14 +125,17 @@ export function TextArea({ label, hint, state = 'default', mono = false, id, row
 interface LabelInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'className' | 'onBlur'> {
   /** Receives the edited value when editing ends (blur or Enter). */
   onCommit: (value: string) => void
+  /** Discards the draft and closes the editor when Escape is pressed. */
+  onCancel: () => void
   /** The smaller size used inside list rows. */
   compact?: boolean
 }
 
 // Inline editor for a short local label, mounted only while editing. It commits on
-// blur; Enter commits too, except during IME composition, where Enter picks the
-// candidate instead.
-export function LabelInput({ onCommit, compact = false, onKeyDown, ...rest }: LabelInputProps) {
+// blur; Enter commits too, except during IME composition. Escape cancels without
+// letting the subsequent blur commit or the containing drawer close.
+export function LabelInput({ onCommit, onCancel, compact = false, onKeyDown, ...rest }: LabelInputProps) {
+  const settled = useRef(false)
   return (
     <input
       autoFocus
@@ -140,9 +143,23 @@ export function LabelInput({ onCommit, compact = false, onKeyDown, ...rest }: La
       {...rest}
       onKeyDown={(event) => {
         onKeyDown?.(event)
-        if (event.key === 'Enter' && !event.nativeEvent.isComposing) event.currentTarget.blur()
+        if (event.defaultPrevented) return
+        if (event.key !== 'Escape' && event.key !== 'Enter') return
+        event.stopPropagation()
+        if (event.nativeEvent.isComposing) return
+        event.preventDefault()
+        if (event.key === 'Escape') {
+          settled.current = true
+          onCancel()
+        } else {
+          event.currentTarget.blur()
+        }
       }}
-      onBlur={(event) => onCommit(event.currentTarget.value)}
+      onBlur={(event) => {
+        if (settled.current) return
+        settled.current = true
+        onCommit(event.currentTarget.value)
+      }}
     />
   )
 }

@@ -1,0 +1,7 @@
+{
+  "id": "clarify-transaction-notes-and-cancel-editing",
+  "scope": "shared",
+  "type": "fixed",
+  "bump": "patch",
+  "text": "Transaction labels are now described as local notes with clear keyboard hints. Escape cancels an edit without saving or closing the transaction drawer, and saved notes appear immediately."
+}
