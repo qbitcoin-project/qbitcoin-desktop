@@ -47,7 +47,7 @@ test('export a descriptor, add it as a watch wallet, see it blocked, then remove
 
     // Send is blocked for a watch wallet — the form is replaced by a notice.
     await page.getByRole('button', { name: 'Send', exact: true }).click()
-    await expect(page.getByText('Watch-only wallet')).toBeVisible()
+    await expect(page.getByText('Watch-only wallet', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Review send' })).toHaveCount(0)
 
     // Remove it from Accounts; the watch wallet (and the badge) disappear.

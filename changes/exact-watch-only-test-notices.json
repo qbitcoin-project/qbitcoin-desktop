@@ -1,0 +1,7 @@
+{
+  "id": "exact-watch-only-test-notices",
+  "scope": "shared",
+  "type": "internal",
+  "bump": "none",
+  "text": "Match the watch-only notice exactly in UI tests so release-history text cannot be mistaken for the Send restriction."
+}

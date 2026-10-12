@@ -42,7 +42,7 @@ test('import a second seed wallet, see it sign-capable, then remove it', async (
 
     // A seed wallet can sign: Send shows the form, not the watch-only notice.
     await page.getByRole('button', { name: 'Send', exact: true }).click()
-    await expect(page.getByText('Watch-only wallet')).toHaveCount(0)
+    await expect(page.getByText('Watch-only wallet', { exact: true })).toHaveCount(0)
 
     // Remove it from Accounts (only non-primary wallets have a Remove control).
     await page.getByRole('button', { name: 'Settings' }).click()
