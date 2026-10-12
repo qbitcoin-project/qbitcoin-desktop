@@ -64,6 +64,7 @@ export function Convert() {
   const [dest, setDest] = useState('')
   const [stage, setStage] = useState<Stage>('form')
   const [plan, setPlan] = useState<UpgradePlanView | null>(null)
+  const [reviewedRequest, setReviewedRequest] = useState<UpgradeConvertRequest | null>(null)
   const [txid, setTxid] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -140,6 +141,7 @@ export function Convert() {
     setError(null)
     try {
       setPlan(await wallet.upgradePlan(request))
+      setReviewedRequest(request)
       setStage('review')
     } catch (e) {
       setError((e as Error).message)
@@ -149,12 +151,14 @@ export function Convert() {
   }
 
   const confirm = async (): Promise<void> => {
-    if (request === null) return
+    // Submit the reviewed request even if a background refresh changed the
+    // balance. Main rechecks the current UTXOs and reports a missing deposit.
+    if (reviewedRequest === null) return
     setBusy(true)
     setError(null)
     setStage('sending')
     try {
-      const res = await wallet.upgradeConvert(request, dest.trim())
+      const res = await wallet.upgradeConvert(reviewedRequest, dest.trim())
       setTxid(res.txid)
       setStage('done')
       refresh()
@@ -209,12 +213,12 @@ export function Convert() {
   }
 
   const downConfirm = async (): Promise<void> => {
-    if (downAmountInvalid || downAmountCheck.atomic === null) return
+    if (downPlan === null) return
     setDownBusy(true)
     setDownError(null)
     setDownStage('sending')
     try {
-      const res = await wallet.downgradeConvert(downAmountCheck.atomic.toString(), downAddr.trim())
+      const res = await wallet.downgradeConvert(downPlan.amountAtomic, downAddr.trim())
       setDownTxid(res.txid)
       setDownStage('done')
       refresh()
@@ -247,7 +251,9 @@ export function Convert() {
   }
 
   const confirmedSat = status?.confirmedBalanceSat ?? '0'
-  const hasFunds = BigInt(confirmedSat) > 0n
+  const pendingSat = status?.pendingBalanceSat ?? '0'
+  const availableSat = (BigInt(confirmedSat) + BigInt(pendingSat)).toString()
+  const hasFunds = BigInt(availableSat) > 0n
 
   // Source-chain explorer link for the BUILD's network (a testnet profile
   // must never open a mainnet explorer). Hidden until the network is known.
@@ -261,8 +267,8 @@ export function Convert() {
       .then((i) => setMinSat(i.minConvertValueSat ?? null))
       .catch(() => {})
   }, [])
-  const amountCheck = validateAmount(convertAll ? fromSat(confirmedSat) : amount, {
-    available: status === null ? null : BigInt(confirmedSat),
+  const amountCheck = validateAmount(convertAll ? fromSat(availableSat) : amount, {
+    available: status === null ? null : BigInt(availableSat),
     minimum: minSat === null ? null : BigInt(minSat),
   })
   const amountInvalid = amountCheck.atomic === null || amountCheck.error !== null
@@ -334,10 +340,10 @@ export function Convert() {
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
             <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: 'var(--ink-900)' }}>2 · Convert to {nativeLabel}</div>
             <span style={{ fontSize: 13, fontFamily: 'var(--mono)', fontVariantNumeric: 'tabular-nums', color: 'var(--ink-700)' }}>
-              {fmtSat(confirmedSat)} {src}
+              {fmtSat(availableSat)} {src}
             </span>
-            {status !== null && BigInt(status.pendingBalanceSat) > 0n && (
-              <span style={{ fontSize: 11.5, color: 'var(--warning)' }}>+{fmtSat(status.pendingBalanceSat)} pending</span>
+            {BigInt(pendingSat) > 0n && (
+              <span style={{ fontSize: 11.5, color: 'var(--warning)' }}>includes {fmtSat(pendingSat)} pending</span>
             )}
           </div>
 
@@ -355,7 +361,7 @@ export function Convert() {
                       mono
                       // "All" shows the balance it will spend (the network fee is
                       // subtracted at review, where the exact number is known).
-                      value={convertAll ? (hasFunds ? fromSat(confirmedSat) : '') : amount}
+                      value={convertAll ? (hasFunds ? fromSat(availableSat) : '') : amount}
                       disabled={convertAll}
                       inputMode="decimal"
                       onChange={(e) => { setAmount(e.target.value); setError(null) }}

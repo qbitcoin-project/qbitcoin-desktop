@@ -6,7 +6,7 @@ const token = { id: 'token-test', name: 'Test Token', symbol: 'TOK', decimals: 2
 const wallets = [{ id: 'main', label: 'Main Wallet', kind: query.has('key') ? 'key' : 'seed', active: true, canSign: true, removable: false, address }]
 if (query.has('accounts')) wallets.push({ id: 'imported', label: 'Imported key', kind: 'key', active: false, canSign: true, removable: true, address: 'single-key-test-address' })
 const calls = []
-window.walletUiTest = { calls }
+window.walletUiTest = { calls, depositAvailable: true }
 const methods = {
   getNode: () => ({ network: 'mainnet', selected: 'public', publicNodes: [], customNodes: [], tor: false, hasAuth: false }),
   nodeStatus: () => ({ url: '', reachable: false }),
@@ -19,8 +19,9 @@ const methods = {
   listCoins: () => [coin, { ...coin, outpoint: 'bb:0', valueAtomic: '900000000', frozen: true }],
   getReceiveAddress: (algo = 'ecdsa') => algo === 'falcon512' ? 'falcon-test-address' : address,
   upgradeInfo: () => ({ enabled: true, minConvertValueSat: '10000' }),
-  upgradeStatus: () => ({ stagingAddress: 'staging-test-address', stagingIndex: 0, confirmedBalanceSat: query.has('pending') ? '0' : '100000000', pendingBalanceSat: query.has('pending') ? '100000000' : '0', episodes: [] }),
+  upgradeStatus: () => ({ stagingAddress: 'staging-test-address', stagingIndex: 0, confirmedBalanceSat: query.has('pending') ? '0' : '100000000', pendingBalanceSat: query.has('pending') && window.walletUiTest.depositAvailable ? '100000000' : '0', episodes: [] }),
   upgradePlan: (request) => ({ sendValueSat: request.mode === 'all' ? '99999000' : request.amountSat, feeSat: '1000', changeValueSat: '0', feeRate: 1, foldedChange: false }),
+  upgradeConvert: () => { throw new Error('Nothing to convert: no BTC available on the staging address.') },
   downgradeInfo: () => ({ enabled: true }),
   downgradeStatus: () => [],
   downgradePlan: (amountAtomic) => ({ amountAtomic, feeAtomic: '1000', estimatedBtcSat: '10000', level: 1 }),

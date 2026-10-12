@@ -142,8 +142,11 @@ export class UpgradeService {
    */
   async planConvert(request: ConvertRequest): Promise<ConvertPlan> {
     const { address } = await this.stagingAddress()
-    const utxos = (await this.chain.addressUtxos(address)).filter((u) => u.confirmed)
-    if (utxos.length === 0) throw new Error('Nothing to convert: no confirmed BTC on the staging address.')
+    // The source chain can spend a mempool deposit. Fetch the current unspent
+    // set again at convert time, so a removed or replaced deposit is not reused
+    // from the preview. Crediting still follows the protocol confirmation rules.
+    const utxos = await this.chain.addressUtxos(address)
+    if (utxos.length === 0) throw new Error('Nothing to convert: no BTC available on the staging address.')
     const total = utxos.reduce((s, u) => s + u.value, 0n)
     const feeRate = await this.feeRate()
     const inputs = utxos.map((u) => ({ txid: u.txid, vout: u.vout }))
@@ -160,7 +163,7 @@ export class UpgradeService {
     const feeWithChange = feeFor(sizeFor(utxos.length, [LOCK_OUT_LEN, OP_RETURN_OUT_LEN, LOCK_OUT_LEN]), feeRate)
     const remainder = total - amount - feeWithChange
     if (remainder < 0n) {
-      throw new Error('Insufficient confirmed balance for this amount plus the network fee.')
+      throw new Error('Insufficient available balance for this amount plus the network fee.')
     }
     if (remainder <= this.params.dustLimit) {
       // Sub-dust remainder: no change output; the remainder joins the fee.

@@ -1,0 +1,7 @@
+{
+  "id": "convert-mempool-deposits",
+  "scope": "shared",
+  "type": "fixed",
+  "bump": "patch",
+  "text": "BTC conversion can now start as soon as a deposit appears in the mempool, without waiting for its first confirmation. The conversion balance includes pending deposits."
+}

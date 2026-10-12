@@ -127,16 +127,16 @@ describe('status', () => {
 })
 
 describe('planConvert', () => {
-  it('mode all spends everything minus the fee, no change', async () => {
+  it('mode all spends confirmed and mempool deposits minus the fee, no change', async () => {
     const { service } = harness({
       utxosByAddress: { [ADDR0]: [utxo('aa'.repeat(32), 0, 5_000_000n), utxo('bb'.repeat(32), 1, 300_000n, false)] },
     })
     const plan = await service.planConvert({ mode: 'all' })
-    // 1 confirmed input; size = 10 + 149 + 34 + 43 = 236; fee = 236*3 = 708.
-    expect(plan.fee).toBe(708n)
-    expect(plan.sendValue).toBe(5_000_000n - 708n)
+    // 2 inputs; size = 10 + 298 + 34 + 43 = 385; fee = 385*3 = 1155.
+    expect(plan.fee).toBe(1155n)
+    expect(plan.sendValue).toBe(5_300_000n - 1155n)
     expect(plan.changeValue).toBe(0n)
-    expect(plan.inputs).toHaveLength(1) // unconfirmed UTXO not spendable
+    expect(plan.inputs).toHaveLength(2)
   })
 
   it('mode amount produces change above dust', async () => {
@@ -179,6 +179,25 @@ describe('planConvert', () => {
 })
 
 describe('convert', () => {
+  it.each(['all', 'amount'] as const)('converts a deposit that is only in the mempool (%s)', async (mode) => {
+    const { service, broadcasts } = harness({ utxosByAddress: { [ADDR0]: [utxo('aa'.repeat(32), 0, 5_000_000n, false)] } })
+    const request = mode === 'all' ? { mode } : { mode, amountSat: 3_000_000n }
+    const { plan } = await service.convert(request, DEST32)
+    expect(plan.inputs).toEqual([{ txid: 'aa'.repeat(32), vout: 0 }])
+    expect(plan.sendValue + plan.changeValue + plan.fee).toBe(5_000_000n)
+    expect(broadcasts).toHaveLength(1)
+    expect(broadcasts[0]).toContain(LOCK_SCRIPT_HEX)
+  })
+
+  it('does not broadcast if a mempool deposit disappears after preview', async () => {
+    const state = { utxosByAddress: { [ADDR0]: [utxo('aa'.repeat(32), 0, 5_000_000n, false)] } }
+    const { service, broadcasts } = harness(state)
+    await service.planConvert({ mode: 'all' })
+    state.utxosByAddress[ADDR0] = []
+    await expect(service.convert({ mode: 'all' }, DEST32)).rejects.toThrow(/Nothing to convert/)
+    expect(broadcasts).toHaveLength(0)
+  })
+
   it('broadcasts a spend paying the lock script and the OP_RETURN commitment', async () => {
     const { service, broadcasts, savedIndex } = harness({
       utxosByAddress: { [ADDR0]: [utxo('aa'.repeat(32), 0, 5_000_000n)] },
