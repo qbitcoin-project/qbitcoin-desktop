@@ -11,7 +11,7 @@ import { AddWalletDialog } from '../components/AddWalletDialog'
 import { setAdvancedMode, useAdvancedMode } from '../lib/prefs'
 import { wallet } from '../lib/wallet'
 import { networkLabel, nodeDotColor, nodeSyncPercent, pollNode, probeNode, resetWalletData, setContacts as cacheSetContacts, setWallets, useActiveWallet, useAddressPlaceholder, useContacts, useNodeStatus, useWallets, type NodeStatusSnapshot } from '../lib/walletData'
-import { BoltIcon, Button, ContactDialog, EyeIcon, GlobeIcon, KeyIcon, Modal, OnionIcon, PasswordField, PasswordStrength, PencilIcon, Pill, PlusIcon, RetryIcon, Screen, Segmented, ServerIcon, ShieldIcon, Switch, TextArea, TextField, TrashIcon, WalletIcon } from '../ui'
+import { Button, ContactDialog, EyeIcon, GlobeIcon, KeyIcon, Modal, OnionIcon, PasswordField, PasswordStrength, PencilIcon, Pill, PlusIcon, RetryIcon, Screen, Segmented, ServerIcon, ShieldIcon, Switch, TextArea, TextField, TrashIcon, WalletIcon } from '../ui'
 
 // Settings: network status, device security, selected-wallet backup, and contacts.
 // Secret backups require fresh password authentication. Every key operation
@@ -65,10 +65,8 @@ function hostOf(url: string): string {
   }
 }
 
-// The node the wallet talks to: a Public slot (bundled Esplora REST), the user's own
-// Esplora REST node, or Electrum (not wired yet). The live status row, title bar and
-// sidebar all read the shared node-status store; Tor and the network switch are
-// placeholders for now.
+// Connect to bundled public nodes or a user-provided Esplora REST endpoint.
+// The live status row and title bar read the shared node-status store.
 function NetworkCard() {
   const [settings, setSettings] = useState<NodeSettings | null>(null)
   const [editing, setEditing] = useState(false)
@@ -104,7 +102,7 @@ function NetworkCard() {
     try {
       applySettings(await wallet.selectNode(kind, url))
     } catch {
-      // e.g. Electrum not available yet — ignore.
+      // Keep the current selection if the settings could not be saved.
     }
   }
 
@@ -176,7 +174,6 @@ function NetworkCard() {
           Add public node
         </Button>
       </div>
-      <NodeSlot icon={<BoltIcon size={18} />} name="Electrum server" detail="Coming soon · SSL" disabled />
       <NodeStatusRow snap={node} onRetry={() => void probeNode()} />
       <TorRow />
       <NetworkRow network={settings?.network} />
@@ -417,7 +414,7 @@ function NetworkFootnote() {
       <span style={{ display: 'flex', color: 'var(--ink-300)', flex: 'none', marginTop: 1 }}>
         <ShieldIcon size={15} />
       </span>
-      <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-500)', lineHeight: 1.5 }}>Using your own node or Electrum — optionally over Tor — means you don&apos;t reveal your addresses or IP to a third-party server.</p>
+      <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-500)', lineHeight: 1.5 }}>Using your own node — optionally over Tor — means you don&apos;t reveal your addresses or IP to a third-party server.</p>
     </div>
   )
 }

@@ -1,0 +1,7 @@
+{
+  "id": "remove-electrum-settings-placeholder",
+  "scope": "shared",
+  "type": "removed",
+  "bump": "patch",
+  "text": "Removed the unavailable Electrum server option and its reference from connection settings."
+}
