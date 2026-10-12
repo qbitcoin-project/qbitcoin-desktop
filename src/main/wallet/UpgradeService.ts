@@ -12,6 +12,7 @@ import {
 } from '@qbtc/crypto'
 import type { BtcHistoryTx, BtcUtxo } from '@qbtc/chain'
 import { deriveBtcStagingAddress, deriveBtcStagingKey } from './btcStaging'
+import { upgradeOutpoint, type UpgradeCredit, type UpgradeCreditLookup } from './UpgradeCreditLookup'
 
 // The BTC→native upgrade flow, main-process core. One staging episode = one fresh
 // P2PKH key; this service derives it, watches it through a Bitcoin
@@ -59,6 +60,8 @@ export interface UpgradeVault {
 /** A conversion episode reconstructed from the chain. */
 export interface UpgradeEpisode {
   readonly txid: string
+  /** Index of the source-chain lock output, used to match the native coinbase. */
+  readonly lockVout: number
   /** Satoshi locked (the value of the lock output). */
   readonly lockValue: bigint
   /** Destination scripthash committed via OP_RETURN, hex; null = fallback credit. */
@@ -67,6 +70,7 @@ export interface UpgradeEpisode {
   readonly blockHeight?: number
   /** BTC confirmations at status time (credits need 6 + a 2h timer). */
   readonly confirmations?: number
+  readonly credit?: UpgradeCredit
 }
 
 export interface UpgradeStatus {
@@ -102,6 +106,7 @@ export class UpgradeService {
     private readonly chain: BtcChainReader,
     private readonly params: UpgradeParams,
     private readonly network: BtcNetwork = 'mainnet',
+    private readonly credits?: UpgradeCreditLookup,
   ) {
     this.vault.on((event) => {
       if (event.type === 'locked' || event.type === 'destroyed' || event.type === 'created') {
@@ -127,12 +132,17 @@ export class UpgradeService {
       if (u.confirmed) confirmed += u.value
       else pending += u.value
     }
+    const episodes = await this.reconstructEpisodes(index)
+    const credits = await this.credits?.find(episodes)
     return {
       stagingAddress: address,
       stagingIndex: index,
       confirmedBalance: confirmed,
       pendingBalance: pending,
-      episodes: await this.reconstructEpisodes(index),
+      episodes: episodes.map((episode) => {
+        const credit = credits?.get(upgradeOutpoint(episode))
+        return credit === undefined ? episode : { ...episode, credit }
+      }),
     }
   }
 
@@ -268,6 +278,7 @@ export class UpgradeService {
           next !== undefined && next.scriptPubKeyHex.startsWith('6a') ? next.scriptPubKeyHex.slice(4) : null
         episodes.push({
           txid: tx.txid,
+          lockVout: lockAt,
           lockValue: tx.outputs[lockAt]!.value,
           destScripthashHex,
           confirmed: tx.status.confirmed,

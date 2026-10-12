@@ -7,7 +7,9 @@ const wallets = [{ id: 'main', label: 'Main Wallet', kind: query.has('key') ? 'k
 if (query.has('accounts')) wallets.push({ id: 'imported', label: 'Imported key', kind: 'key', active: false, canSign: true, removable: true, address: 'single-key-test-address' })
 const calls = []
 const transaction = { txid: 'ab'.repeat(32), direction: 'in', amountAtomic: '100000000', feeAtomic: '1000', confirmed: true, blockTime: 1700000000 }
-window.walletUiTest = { calls, depositAvailable: true }
+window.walletUiTest = { calls, depositAvailable: true, creditState: query.get('credit') ?? 'pending' }
+const conversion = { txid: 'aa'.repeat(32), lockValueSat: '1000000', destScripthashHex: '29'.repeat(32), confirmed: true, confirmations: 9 }
+const conversionCredit = { state: 'received', txid: 'cc'.repeat(32), amountAtomic: '250000000', address: 'native-conversion-destination', blockHeight: 1234, blockTime: 1700000000 }
 const methods = {
   getNode: () => ({ network: 'mainnet', selected: 'public', publicNodes: [], customNodes: [], tor: false, hasAuth: false }),
   nodeStatus: () => ({ url: '', reachable: false }),
@@ -23,7 +25,12 @@ const methods = {
   listCoins: () => [coin, { ...coin, outpoint: 'bb:0', valueAtomic: '900000000', frozen: true }],
   getReceiveAddress: (algo = 'ecdsa') => algo === 'falcon512' ? 'falcon-test-address' : address,
   upgradeInfo: () => ({ enabled: true, minConvertValueSat: '10000' }),
-  upgradeStatus: () => ({ stagingAddress: 'staging-test-address', stagingIndex: 0, confirmedBalanceSat: query.has('pending') ? '0' : '100000000', pendingBalanceSat: query.has('pending') && window.walletUiTest.depositAvailable ? '100000000' : '0', episodes: [] }),
+  upgradeStatus: () => ({
+    stagingAddress: 'staging-test-address', stagingIndex: 0,
+    confirmedBalanceSat: query.has('pending') ? '0' : '100000000',
+    pendingBalanceSat: query.has('pending') && window.walletUiTest.depositAvailable ? '100000000' : '0',
+    episodes: query.has('credits') ? [{ ...conversion, credit: window.walletUiTest.creditState === 'received' ? conversionCredit : { state: window.walletUiTest.creditState } }] : [],
+  }),
   upgradePlan: (request) => ({ sendValueSat: request.mode === 'all' ? '99999000' : request.amountSat, feeSat: '1000', changeValueSat: '0', feeRate: 1, foldedChange: false }),
   upgradeConvert: () => { throw new Error('Nothing to convert: no BTC available on the staging address.') },
   downgradeInfo: () => ({ enabled: true }),

@@ -2,6 +2,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import type { DowngradeEpisodeIpcView, DowngradePlanView, UpgradeConvertRequest, UpgradePlanView, UpgradeStatusView } from '../../shared/protocol'
 import { brand } from '../brand'
+import { UpgradeConversionRow } from '../components/UpgradeConversionRow'
 import { formatToken } from '../lib/format'
 import { wallet } from '../lib/wallet'
 import { validateAmount } from '../lib/amountValidation'
@@ -464,35 +465,7 @@ export function Convert() {
             <div style={{ padding: '0 20px 18px', fontSize: 13, color: 'var(--ink-500)' }}>No conversions from this wallet yet.</div>
           ) : (
             status.episodes.map((e) => (
-              <div key={e.txid} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 20px', borderTop: '1px solid var(--border)' }}>
-                <span style={{ width: 7, height: 7, flex: 'none', borderRadius: '50%', background: e.confirmed ? 'var(--success)' : 'var(--warning)' }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, fontFamily: 'var(--mono)', fontVariantNumeric: 'tabular-nums', color: 'var(--ink-900)' }}>
-                    {fmtSat(e.lockValueSat)} {src}
-                  </div>
-                  <CopyValue
-                    text={e.txid}
-                    style={{ display: 'block', fontSize: 11, color: 'var(--ink-500)', fontFamily: 'var(--mono)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-                  />
-                </div>
-                <span style={{ fontSize: 11.5, color: e.confirmed ? 'var(--ink-500)' : 'var(--warning)', flex: 'none' }}>
-                  {e.confirmed
-                    ? e.confirmations !== undefined && e.confirmations < 6
-                      ? `${String(e.confirmations)}/6 confirmations`
-                      : `confirmed · crediting ≤2h`
-                    : 'pending'}
-                </span>
-                {explorerTxBase !== null && (
-                  <button
-                    type="button"
-                    className="content-refresh"
-                    style={{ height: 26, padding: '0 8px', fontSize: 11.5 }}
-                    onClick={() => window.open(`${explorerTxBase}${e.txid}`, '_blank', 'noopener')}
-                  >
-                    Explorer
-                  </button>
-                )}
-              </div>
+              <UpgradeConversionRow key={e.txid} episode={e} sourceLabel={src} nativeLabel={nativeLabel} sourceExplorer={explorerTxBase} />
             ))
           )}
         </section>

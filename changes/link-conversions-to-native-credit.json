@@ -1,0 +1,7 @@
+{
+  "id": "link-conversions-to-native-credit",
+  "scope": "shared",
+  "type": "fixed",
+  "bump": "patch",
+  "text": "Completed conversions now show the amount received, destination address and credit time, with an explorer link to the receiving coinbase transaction. Pending conversions retain a clearly labelled source-chain link."
+}

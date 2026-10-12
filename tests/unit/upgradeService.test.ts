@@ -3,6 +3,7 @@ import type { BtcHistoryTx, BtcUtxo } from '@qbtc/chain'
 import { describe, expect, it } from 'vitest'
 import { btcStagingPath, deriveBtcStagingAddress } from '../../src/main/wallet/btcStaging'
 import { UpgradeService, type UpgradeParams } from '../../src/main/wallet/UpgradeService'
+import { UpgradeCreditLookup } from '../../src/main/wallet/UpgradeCreditLookup'
 
 // Standard BIP-39 test mnemonic. The staging branch is plain Bitcoin
 // BIP-44 (m/44'/0'/0'/0/i), so index 0 is the FAMOUS reference address —
@@ -36,7 +37,7 @@ interface FakeChainState {
   tip?: number
 }
 
-function harness(state: FakeChainState = {}) {
+function harness(state: FakeChainState = {}, credits?: UpgradeCreditLookup) {
   const broadcasts: string[] = []
   let saved: number | null = null
   const vault = { getMasterKey: async (): Promise<HDKey> => MASTER, on: () => () => {} }
@@ -59,7 +60,7 @@ function harness(state: FakeChainState = {}) {
     },
     tipHeight: async () => state.tip ?? 850_105,
   }
-  const service = new UpgradeService(vault, store, chain, PARAMS)
+  const service = new UpgradeService(vault, store, chain, PARAMS, 'mainnet', credits)
   return { service, broadcasts, savedIndex: () => saved }
 }
 
@@ -101,6 +102,7 @@ describe('status', () => {
     expect(status.episodes[0]).toMatchObject({
       txid: 'cc'.repeat(32),
       lockValue: 4_999_295n,
+      lockVout: 0,
       destScripthashHex: '29'.repeat(32),
       confirmed: true,
       blockHeight: 850_100,
@@ -123,6 +125,27 @@ describe('status', () => {
     const status = await service.status()
     expect(status.episodes[0]!.destScripthashHex).toBeNull()
     expect(status.episodes[0]!.confirmed).toBe(false)
+  })
+
+  it('attaches the native coinbase to the correct source lock output', async () => {
+    const txid = 'cc'.repeat(32)
+    const credits = new UpgradeCreditLookup({
+      getAddressTransactions: async () => [{
+        txid: 'ee'.repeat(32), version: 3, vin: [], vout: [{ scripthash: '29'.repeat(32), value: 990_000n }],
+        size: 200, fee: 0n, status: { confirmed: true, blockHeight: 1234 },
+        coinbaseInfo: { btcTxid: txid, btcOutNum: 1, btcBlockHeight: 850100, valueSat: 1_000_000n },
+      }],
+      getTransaction: async () => { throw new Error('Unexpected detail lookup') },
+    }, () => 'native-destination')
+    const { service } = harness({ txsByAddress: { [ADDR0]: [{
+      txid, status: { confirmed: true, blockHeight: 850100 }, outputs: [
+        { scriptPubKeyHex: '00', value: 1n },
+        { scriptPubKeyHex: LOCK_SCRIPT_HEX, value: 1_000_000n },
+        { scriptPubKeyHex: `6a20${'29'.repeat(32)}`, value: 0n },
+      ],
+    }] } }, credits)
+    const status = await service.status()
+    expect(status.episodes[0]).toMatchObject({ lockVout: 1, credit: { state: 'received', txid: 'ee'.repeat(32), amountAtomic: 990_000n, address: 'native-destination' } })
   })
 })
 

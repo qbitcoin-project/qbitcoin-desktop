@@ -30,6 +30,7 @@ import { deriveInputKeypair, signUnsignedTx } from '../wallet/signTx'
 import { SnapshotStore } from '../wallet/snapshot'
 import { gatherFromActive, type GatheredUtxo } from '../wallet/spendable'
 import { UpgradeService, type ConvertPlan, type ConvertRequest } from '../wallet/UpgradeService'
+import { UpgradeCreditLookup } from '../wallet/UpgradeCreditLookup'
 import { DowngradeService, type ReclaimKeyCell } from '../wallet/DowngradeService'
 import { DowngradeMetaStore } from '../wallet/downgradeStore'
 import { UpgradeMetaStore } from '../wallet/upgradeStore'
@@ -187,6 +188,7 @@ export function createWalletCore(): WalletCore {
           new BtcEsploraClient({ baseUrl: btcEsploraDefaultsFor(NETWORK)[0]! }),
           UPGRADE[NETWORK],
           NETWORK,
+          new UpgradeCreditLookup(chainClient, (hex) => addressFromScripthash(Uint8Array.from(Buffer.from(hex, 'hex')), NETWORK)),
         )
       }
       addressSource = source
@@ -903,6 +905,9 @@ export function createWalletCore(): WalletCore {
             confirmed: e.confirmed,
             ...(e.blockHeight !== undefined ? { blockHeight: e.blockHeight } : {}),
             ...(e.confirmations !== undefined ? { confirmations: e.confirmations } : {}),
+            ...(e.credit !== undefined ? {
+              credit: e.credit.state === 'received' ? { ...e.credit, amountAtomic: e.credit.amountAtomic.toString() } : e.credit,
+            } : {}),
           })),
         }
       },

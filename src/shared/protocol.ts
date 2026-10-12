@@ -115,6 +115,17 @@ export type UpgradeConvertRequest =
   | { readonly mode: 'all' }
   | { readonly mode: 'amount'; readonly amountSat: string }
 
+export type UpgradeCreditView =
+  | { readonly state: 'pending' | 'unavailable' }
+  | {
+      readonly state: 'received'
+      readonly txid: string
+      readonly amountAtomic: string
+      readonly address: string
+      readonly blockHeight?: number
+      readonly blockTime?: number
+    }
+
 export interface UpgradeEpisodeView {
   readonly txid: string
   readonly lockValueSat: string
@@ -124,6 +135,8 @@ export interface UpgradeEpisodeView {
   readonly blockHeight?: number
   /** BTC confirmations at status time (credits need 6 + a 2h timer). */
   readonly confirmations?: number
+  /** Native-chain credit matched to this conversion's BTC lock output. */
+  readonly credit?: UpgradeCreditView
 }
 
 export interface UpgradeStatusView {
