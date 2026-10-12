@@ -11,7 +11,7 @@ import { AtomIcon, Button, CheckIcon, CopyIcon, Modal, Pill, PlusIcon, Screen, S
 // address of one algorithm — main returns it whatever algo is asked — so the
 // type toggle and the address controls are hidden, and the post-quantum badge
 // is inferred from the address shape (PQ scripthashes are 32 bytes → 52 chars).
-export function Receive() {
+export function Receive({ initialAlgo = 'ecdsa' }: { initialAlgo?: AddressAlgo }) {
   const wallets = useWallets()
   const singleKey = wallets.find((w) => w.active)?.kind === 'key'
   const [address, setAddress] = useState<string | null>(null)
@@ -21,7 +21,7 @@ export function Receive() {
   const [allOpen, setAllOpen] = useState(false)
   const [all, setAll] = useState<readonly ReceiveAddressEntry[]>([])
   const [copiedAddr, setCopiedAddr] = useState<string | null>(null)
-  const [algo, setAlgo] = useState<AddressAlgo>('ecdsa')
+  const [algo, setAlgo] = useState<AddressAlgo>(initialAlgo)
   const pq = singleKey ? address !== null && address.length > 40 : algo === 'falcon512'
 
   useEffect(() => {

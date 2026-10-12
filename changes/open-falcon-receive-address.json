@@ -1,0 +1,7 @@
+{
+  "id": "open-falcon-receive-address",
+  "scope": "shared",
+  "type": "fixed",
+  "bump": "patch",
+  "text": "The Falcon address shortcut now opens Receive with Falcon-512 selected. Wallets containing only a classical key no longer offer this shortcut."
+}

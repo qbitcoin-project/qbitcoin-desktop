@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import type { TokenBalance } from '../../shared/protocol'
+import type { AddressAlgo, TokenBalance } from '../../shared/protocol'
 import { brand } from '../brand'
 import { WalletSwitcher } from '../components/WalletSwitcher'
 import { wallet } from '../lib/wallet'
@@ -51,6 +51,7 @@ function pageMeta(network: 'mainnet' | 'testnet' | null): Record<Nav, { title: s
 
 export function WalletShell({ collapsed = false, onShowChangelog }: { collapsed?: boolean; onShowChangelog: () => void }) {
   const [nav, setNav] = useState<Nav>('wallet')
+  const [receiveAlgo, setReceiveAlgo] = useState<AddressAlgo>('ecdsa')
   const [preselected, setPreselected] = useState<readonly string[]>([])
   // The footer's network selector: its label is the BUILD's network as reported
   // by main (testnet tinted orange); the dot carries the live connection status
@@ -101,6 +102,7 @@ export function WalletShell({ collapsed = false, onShowChangelog }: { collapsed?
   }, [convertEnabled, nav])
 
   function go(to: Nav): void {
+    if (to === 'receive') setReceiveAlgo('ecdsa')
     // A plain navigation to Send (sidebar or hero) always means a native coin send.
     if (to === 'send') {
       setPreselected([])
@@ -115,7 +117,7 @@ export function WalletShell({ collapsed = false, onShowChangelog }: { collapsed?
       pane = <Send preselected={preselected} token={sendToken} onDone={() => go('wallet')} />
       break
     case 'receive':
-      pane = <Receive />
+      pane = <Receive key={receiveAlgo} initialAlgo={receiveAlgo} />
       break
     case 'convert':
       pane = <Convert />
@@ -141,7 +143,8 @@ export function WalletShell({ collapsed = false, onShowChangelog }: { collapsed?
       pane = (
         <WalletHome
           onSend={() => go('send')}
-          onReceive={() => setNav('receive')}
+          onReceive={() => go('receive')}
+          onReceiveFalcon={() => { setReceiveAlgo('falcon512'); setNav('receive') }}
           onSeeAll={() => setNav('activity')}
           onSendToken={(t) => {
             setPreselected([])

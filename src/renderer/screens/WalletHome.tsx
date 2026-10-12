@@ -3,19 +3,23 @@ import type { HistoryItem, TokenBalance } from '../../shared/protocol'
 import { TxDetailDrawer } from '../components/TxDetailDrawer'
 import { TxLabelLine } from '../components/TxLabelLine'
 import { formatNative, formatToken, historyAmount, shortHash } from '../lib/format'
-import { useAssetLabel, useHistory, useSummary, useTokens } from '../lib/walletData'
+import { useActiveWallet, useAssetLabel, useHistory, useSummary, useTokens } from '../lib/walletData'
 import { AtomIcon, Button, ChevRightIcon, ReceiveIcon, Screen, SendIcon, TokenGlyph } from '../ui'
 
 // Unlocked dashboard: a balance hero + quick actions + recent activity, matching
 // the design's exact spec. Reads come from the shared wallet-data cache (served
 // instantly on revisit, refreshed in the background); it holds no keys.
-export function WalletHome({ onSend, onReceive, onSeeAll, onSendToken }: { onSend: () => void; onReceive: () => void; onSeeAll: () => void; onSendToken: (token: TokenBalance) => void }) {
+export function WalletHome({ onSend, onReceive, onReceiveFalcon, onSeeAll, onSendToken }: { onSend: () => void; onReceive: () => void; onReceiveFalcon: () => void; onSeeAll: () => void; onSendToken: (token: TokenBalance) => void }) {
   const { data: summary, loading } = useSummary()
   const { data: historyData, error } = useHistory()
   const history = historyData?.items
   const { data: tokens } = useTokens()
   const [openTx, setOpenTx] = useState<HistoryItem | null>(null)
   const asset = useAssetLabel()
+  const activeWallet = useActiveWallet()
+  // Single-key wallets cannot derive another algorithm. Only show the shortcut
+  // for seed wallets and imported Falcon keys (32-byte scripthashes).
+  const hasFalcon = activeWallet?.kind === 'seed' || (activeWallet?.kind === 'key' && (activeWallet.address?.length ?? 0) > 40)
 
   return (
     <Screen>
@@ -83,7 +87,7 @@ export function WalletHome({ onSend, onReceive, onSeeAll, onSendToken }: { onSen
               </div>
             )}
 
-            <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 18 }}>
+            {hasFalcon && <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 18 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                 <span style={{ width: 36, height: 36, flex: 'none', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--pq-soft)', color: 'var(--pq)' }}>
                   <AtomIcon size={20} />
@@ -91,10 +95,10 @@ export function WalletHome({ onSend, onReceive, onSeeAll, onSendToken }: { onSen
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-900)' }}>Post-quantum secure</div>
               </div>
               <p style={{ fontSize: 13, color: 'var(--ink-500)', lineHeight: 1.55, margin: '13px 0 0' }}>Your keys are protected by Falcon-512 signatures — safe against future quantum attacks.</p>
-              <button type="button" onClick={onReceive} style={{ marginTop: 14, border: 'none', background: 'transparent', color: 'var(--pq)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
+              <button type="button" onClick={onReceiveFalcon} style={{ marginTop: 14, border: 'none', background: 'transparent', color: 'var(--pq)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
                 View your Falcon address →
               </button>
-            </div>
+            </div>}
           </div>
         </div>
       </div>
