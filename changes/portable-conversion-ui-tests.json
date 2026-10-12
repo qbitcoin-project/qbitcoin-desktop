@@ -1,0 +1,7 @@
+{
+  "id": "portable-conversion-ui-tests",
+  "scope": "shared",
+  "type": "internal",
+  "bump": "none",
+  "text": "Use the active build ticker when checking conversion credit details in UI tests."
+}
