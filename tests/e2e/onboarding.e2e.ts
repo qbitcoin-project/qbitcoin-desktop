@@ -79,10 +79,10 @@ test('create a wallet, confirm the phrase, then lock and unlock', async () => {
 
     await expect(page.getByRole('heading', { name: "You're all set" })).toBeVisible()
     await page.getByRole('button', { name: 'Open my wallet' }).click()
-    await expect(page.getByRole('button', { name: 'Lock', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Lock wallet', exact: true })).toBeVisible()
 
     // Lock; a wrong password marks the field invalid and describes why; then unlock.
-    await page.getByRole('button', { name: 'Lock' }).click()
+    await page.getByRole('button', { name: 'Lock wallet' }).click()
     await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible()
     const unlockPassword = page.getByLabel('Password', { exact: true })
     await unlockPassword.fill('not-the-password')
@@ -91,7 +91,7 @@ test('create a wallet, confirm the phrase, then lock and unlock', async () => {
     await expect(unlockPassword).toHaveAccessibleDescription('Incorrect password — try again.')
     await unlockPassword.fill(PASSWORD)
     await page.getByRole('button', { name: 'Unlock' }).click()
-    await expect(page.getByRole('button', { name: 'Lock', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Lock wallet', exact: true })).toBeVisible()
   } finally {
     await app.close()
   }
@@ -142,7 +142,7 @@ test('import an existing recovery phrase', async () => {
 
     await expect(page.getByRole('heading', { name: "You're all set" })).toBeVisible()
     await page.getByRole('button', { name: 'Open my wallet' }).click()
-    await expect(page.getByRole('button', { name: 'Lock', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Lock wallet', exact: true })).toBeVisible()
   } finally {
     await app.close()
   }
@@ -160,10 +160,10 @@ test('forgot password — restore from the recovery phrase with a new password',
     await page.getByLabel('Confirm password', { exact: true }).fill(PASSWORD)
     await page.getByRole('button', { name: 'Restore wallet' }).click()
     await page.getByRole('button', { name: 'Open my wallet' }).click()
-    await expect(page.getByRole('button', { name: 'Lock', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Lock wallet', exact: true })).toBeVisible()
 
     // Lock, then recover via the recovery phrase + a NEW password (forgot the old one).
-    await page.getByRole('button', { name: 'Lock' }).click()
+    await page.getByRole('button', { name: 'Lock wallet' }).click()
     await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible()
     await page.getByRole('button', { name: 'Forgot password? Restore from recovery phrase' }).click()
     await expect(page.getByRole('heading', { name: 'Restore wallet' })).toBeVisible()
@@ -176,7 +176,7 @@ test('forgot password — restore from the recovery phrase with a new password',
     await expect(page.getByText('Wallet restored. Enter your new password to unlock.')).toBeVisible()
     await page.getByLabel('Password', { exact: true }).fill(NEW_PASSWORD)
     await page.getByRole('button', { name: 'Unlock', exact: true }).click()
-    await expect(page.getByRole('button', { name: 'Lock', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Lock wallet', exact: true })).toBeVisible()
   } finally {
     await app.close()
   }

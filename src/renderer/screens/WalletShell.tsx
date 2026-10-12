@@ -4,8 +4,8 @@ import { brand } from '../brand'
 import { WalletSwitcher } from '../components/WalletSwitcher'
 import { wallet } from '../lib/wallet'
 import { assetLabelFor } from '../brand/labels'
-import { hydrateFromSnapshot, loadWallets, networkLabel, nodeDotColor, refreshAll, useActiveWallet, useBuildNetwork, useNodeStatus } from '../lib/walletData'
-import { ActivityIcon, AtomIcon, BoltIcon, ChevDownIcon, CoinsIcon, LockIcon, ReceiveIcon, RefreshIcon, SendIcon, SettingsIcon, Sidebar, WalletIcon, type NavItem } from '../ui'
+import { hydrateFromSnapshot, loadWallets, refreshAll, useActiveWallet, useBuildNetwork } from '../lib/walletData'
+import { ActivityIcon, BoltIcon, CoinsIcon, LockIcon, ReceiveIcon, RefreshIcon, SendIcon, SettingsIcon, Sidebar, WalletIcon, type NavItem } from '../ui'
 import { Activity } from './Activity'
 import { Coins } from './Coins'
 import { Convert } from './Convert'
@@ -49,16 +49,11 @@ function pageMeta(network: 'mainnet' | 'testnet' | null): Record<Nav, { title: s
   }
 }
 
-export function WalletShell({ collapsed = false, onShowChangelog }: { collapsed?: boolean; onShowChangelog: () => void }) {
+export function WalletShell({ collapsed = false }: { collapsed?: boolean }) {
   const [nav, setNav] = useState<Nav>('wallet')
   const [receiveAlgo, setReceiveAlgo] = useState<AddressAlgo>('ecdsa')
   const [preselected, setPreselected] = useState<readonly string[]>([])
-  // The footer's network selector: its label is the BUILD's network as reported
-  // by main (testnet tinted orange); the dot carries the live connection status
-  // (green/amber/red/grey).
-  const netDot = nodeDotColor(useNodeStatus())
   const buildNet = useBuildNetwork()
-  const netLabel = networkLabel(buildNet)
   // Which asset the Send pane composes. null = native coin (the sidebar/hero Send,
   // and coin-control); a token when opened from the Tokens panel.
   const [sendToken, setSendToken] = useState<TokenBalance | null>(null)
@@ -156,47 +151,12 @@ export function WalletShell({ collapsed = false, onShowChangelog }: { collapsed?
   }
 
   const footer = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-      {/* Network selector — its dot + label mirror the live node status; opens the
-          network/connection settings (network switching lives there). */}
-      {collapsed ? (
-        <button type="button" onClick={() => go('settings')} title={`${netLabel} · network`} style={{ display: 'flex', justifyContent: 'center', padding: '9px 0', background: 'transparent', border: 'none', cursor: 'pointer' }}>
-          <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: netDot, boxShadow: `0 0 0 3px color-mix(in srgb, ${netDot} 24%, transparent)` }} />
-        </button>
-      ) : (
-        <button type="button" onClick={() => go('settings')} title="Network & connection" style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 10px', borderRadius: 10, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit' }}>
-          <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', flex: 'none', background: netDot, boxShadow: `0 0 0 3px color-mix(in srgb, ${netDot} 24%, transparent)` }} />
-          <span style={{ flex: 1, textAlign: 'left', fontSize: 13, color: buildNet === 'testnet' ? 'var(--warning)' : 'var(--ink-700)', fontWeight: 500 }}>{netLabel}</span>
-          <span style={{ display: 'flex', color: 'var(--ink-500)' }}>
-            <ChevDownIcon size={16} />
-          </span>
-        </button>
-      )}
-      {/* Post-quantum identity — the wallet signs with Falcon-512 (purple PQ pill). */}
-      {collapsed ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '7px 0' }} title="Falcon-512 · post-quantum">
-          <span style={{ display: 'flex', color: 'var(--pq)' }}>
-            <AtomIcon size={18} />
-          </span>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 10, background: 'var(--pq-soft)' }} title="This wallet supports Falcon-512 post-quantum signatures">
-          <span style={{ display: 'flex', color: 'var(--pq)', flex: 'none' }}>
-            <AtomIcon size={16} />
-          </span>
-          <span style={{ flex: 1, fontSize: 13, color: 'var(--pq)', fontWeight: 600 }}>Falcon-512</span>
-          <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--pq)', letterSpacing: '0.04em' }}>PQ</span>
-        </div>
-      )}
-      <button type="button" className="nav-item" data-collapsed={collapsed ? 'true' : undefined} onClick={() => void wallet.lock()} title={collapsed ? 'Lock' : undefined}>
+    <div style={{ paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+      <button type="button" className="nav-item" data-collapsed={collapsed ? 'true' : undefined} onClick={() => void wallet.lock()} aria-label={collapsed ? 'Lock wallet' : undefined} title={collapsed ? 'Lock wallet' : undefined}>
         <span style={{ display: 'flex', width: 20, flex: 'none', justifyContent: 'center' }}>
           <LockIcon size={18} />
         </span>
-        {!collapsed && 'Lock'}
-      </button>
-      <button type="button" className="nav-item changelog-link" data-collapsed={collapsed ? 'true' : undefined}
-        onClick={onShowChangelog} aria-label={`What’s new · Version ${__APP_VERSION__}`} title={`What’s new · Version ${__APP_VERSION__}`}>
-        {collapsed ? <span aria-hidden="true">v</span> : <>What’s new <span className="changelog-link-version">v{__APP_VERSION__}</span></>}
+        {!collapsed && 'Lock wallet'}
       </button>
     </div>
   )

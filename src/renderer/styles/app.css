@@ -632,7 +632,7 @@ textarea.field {
   color: var(--ink-900);
 }
 
-/* Sidebar nav item (also used for the theme/lock controls in the footer). */
+/* Sidebar nav item (also used for the lock action in the footer). */
 .nav-item {
   position: relative;
   display: flex;
@@ -955,8 +955,6 @@ textarea.field {
 .changelog-release ul { padding-left: 20px; }
 .changelog-release li + li { margin-top: 10px; }
 .changelog-release strong { color: var(--ink-900); font-weight: 600; }
-.changelog-link { font-size: 12px; }
-.changelog-link-version { margin-left: auto; font-size: 11px; }
 
 /* Animations. */
 @keyframes qslide {

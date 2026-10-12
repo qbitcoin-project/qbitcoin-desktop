@@ -25,7 +25,7 @@ test('import a second seed wallet, see it sign-capable, then remove it', async (
     await page.getByLabel('Confirm password', { exact: true }).fill(PASSWORD)
     await page.getByRole('button', { name: 'Restore wallet' }).click()
     await page.getByRole('button', { name: 'Open my wallet' }).click()
-    await expect(page.getByRole('button', { name: 'Lock', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Lock wallet', exact: true })).toBeVisible()
 
     // Settings → Accounts → Add wallet → Recovery phrase.
     await page.getByRole('button', { name: 'Settings' }).click()

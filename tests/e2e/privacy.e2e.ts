@@ -222,7 +222,7 @@ test('password errors and retry metadata survive the actual context bridge', asy
     await revealPhrase(page)
     await expect(dialog.getByRole('alert')).toHaveText('Incorrect password — try again.')
     await dialog.getByRole('button', { name: 'Close', exact: true }).click()
-    await page.getByRole('button', { name: 'Lock', exact: true }).click()
+    await page.getByRole('button', { name: 'Lock wallet', exact: true }).click()
     // One reveal failure + three unlock failures share the same main counter.
     for (let i = 0; i < 3; i++) {
       await page.getByLabel(/^(Wallet )?password$/i).fill('wrong')
@@ -278,7 +278,7 @@ test('restore errors remain visible after its input session is revoked', async (
   const { app, page } = await launch()
   try {
     await importPrimary(page)
-    await page.getByRole('button', { name: 'Lock', exact: true }).click()
+    await page.getByRole('button', { name: 'Lock wallet', exact: true }).click()
     await page.getByRole('button', { name: 'Forgot password? Restore from recovery phrase' }).click()
     await acceptPrivacy(page)
     await page.getByLabel('Recovery phrase').fill('not a valid recovery phrase')

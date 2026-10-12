@@ -25,7 +25,7 @@ test('export a descriptor, add it as a watch wallet, see it blocked, then remove
     await page.getByLabel('Confirm password', { exact: true }).fill(PASSWORD)
     await page.getByRole('button', { name: 'Restore wallet' }).click()
     await page.getByRole('button', { name: 'Open my wallet' }).click()
-    await expect(page.getByRole('button', { name: 'Lock', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Lock wallet', exact: true })).toBeVisible()
 
     // Settings → export this seed wallet's watch descriptor.
     await page.getByRole('button', { name: 'Settings' }).click()

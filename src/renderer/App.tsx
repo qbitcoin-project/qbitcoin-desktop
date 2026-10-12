@@ -88,7 +88,7 @@ export function App() {
   let screen: ReactNode = null
   switch (route) {
     case 'wallet':
-      screen = <WalletShell collapsed={collapsed} onShowChangelog={() => setChangelogOpen(true)} />
+      screen = <WalletShell collapsed={collapsed} />
       break
     case 'unlock':
       screen = <Unlock onUnlocked={() => setRoute('wallet')} />

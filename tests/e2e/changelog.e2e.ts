@@ -18,7 +18,7 @@ async function openFromHelp(app: ElectronApplication): Promise<void> {
   })
 }
 
-test('release history works offline before setup, while locked and from the sidebar', async () => {
+test('release history works offline from Help before setup, while locked and while unlocked', async () => {
   const app = await electron.launch({ args: [join(process.cwd(), 'out/main/index.js'), `--user-data-dir=${freshUserData()}`] })
   const page = await focusedWindow(app)
   try {
@@ -60,19 +60,25 @@ test('release history works offline before setup, while locked and from the side
     await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
     await page.getByRole('button', { name: 'Unlock', exact: true }).click()
 
-    const link = page.getByRole('button', { name: `What’s new · Version ${version}`, exact: true })
-    await link.click()
+    const lock = page.getByRole('button', { name: 'Lock wallet', exact: true })
+    await expect(lock).toBeVisible()
+    await lock.focus()
+    await openFromHelp(app)
     await expect(dialog).toBeVisible()
     await page.screenshot({ path: test.info().outputPath('changelog-dark.png') })
     await page.keyboard.press('Escape')
-    await expect(link).toBeFocused()
+    await expect(lock).toBeFocused()
+    await page.screenshot({ path: test.info().outputPath('sidebar-expanded-dark.png') })
     await page.getByRole('button', { name: 'Toggle light and dark theme' }).click()
     await page.getByRole('button', { name: 'Toggle sidebar' }).click()
-    await link.click()
+    await page.screenshot({ path: test.info().outputPath('sidebar-collapsed-light.png') })
+    await openFromHelp(app)
     await expect(dialog).toBeVisible()
     await page.screenshot({ path: test.info().outputPath('changelog-light.png') })
     await page.mouse.click(5, 300)
     await expect(dialog).not.toBeVisible()
+    await lock.click()
+    await expect(page.getByRole('button', { name: 'Unlock', exact: true })).toBeVisible()
   } finally {
     await app.close()
   }

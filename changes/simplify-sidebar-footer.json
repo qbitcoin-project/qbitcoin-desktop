@@ -1,0 +1,7 @@
+{
+  "id": "simplify-sidebar-footer",
+  "scope": "shared",
+  "type": "changed",
+  "bump": "patch",
+  "text": "The sidebar now has a dedicated Lock wallet action at the bottom, with network and Falcon badges removed. Theme controls remain at the top, and release notes are available from Help → What’s new."
+}
