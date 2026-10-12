@@ -1,0 +1,7 @@
+{
+  "id": "validate-send-convert-amounts",
+  "scope": "shared",
+  "type": "fixed",
+  "bump": "patch",
+  "text": "Send and Convert now reject invalid amounts and amounts above the available balance before review, with clear messages beside the amount field."
+}

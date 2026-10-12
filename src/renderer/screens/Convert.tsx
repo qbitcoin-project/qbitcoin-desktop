@@ -1,9 +1,10 @@
 import { QRCodeSVG } from 'qrcode.react'
 import { useCallback, useEffect, useId, useMemo, useState } from 'react'
-import type { DowngradeEpisodeIpcView, DowngradePlanView, UpgradePlanView, UpgradeStatusView } from '../../shared/protocol'
+import type { DowngradeEpisodeIpcView, DowngradePlanView, UpgradeConvertRequest, UpgradePlanView, UpgradeStatusView } from '../../shared/protocol'
 import { brand } from '../brand'
 import { formatToken } from '../lib/format'
 import { wallet } from '../lib/wallet'
+import { validateAmount } from '../lib/amountValidation'
 import { assetLabelFor } from '../brand/labels'
 import { useAddressPlaceholder, useBuildNetwork, useCoins } from '../lib/walletData'
 import { Alert, Button, CheckIcon, CopyIcon, CopyValue, Screen, Segmented, TextField } from '../ui'
@@ -79,6 +80,7 @@ export function Convert() {
   const [downEnabled, setDownEnabled] = useState(false)
   const [downEpisodes, setDownEpisodes] = useState<readonly DowngradeEpisodeIpcView[]>([])
   const [downAmount, setDownAmount] = useState('')
+  const [downAmountLeft, setDownAmountLeft] = useState(false)
   const [downAddr, setDownAddr] = useState('')
   const [downAddrLeft, setDownAddrLeft] = useState(false)
   const [downStage, setDownStage] = useState<Stage>('form')
@@ -131,9 +133,9 @@ export function Convert() {
     return () => clearInterval(timer)
   }, [refresh])
 
-  const request = convertAll ? ({ mode: 'all' } as const) : ({ mode: 'amount', amountSat: toSat(amount) } as const)
-
   const review = async (): Promise<void> => {
+    setAmountLeft(true)
+    if (request === null) return
     setBusy(true)
     setError(null)
     try {
@@ -147,6 +149,7 @@ export function Convert() {
   }
 
   const confirm = async (): Promise<void> => {
+    if (request === null) return
     setBusy(true)
     setError(null)
     setStage('sending')
@@ -186,12 +189,17 @@ export function Convert() {
     () => (coinsData ?? []).filter((c) => !c.frozen && c.tokenId === undefined).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n),
     [coinsData],
   )
+  const downAmountCheck = validateAmount(downAmount, { available: coinsData === undefined ? null : downAvailable })
+  const downAmountInvalid = downAmountCheck.atomic === null || downAmountCheck.error !== null
+  const showDownAmountError = downAmountLeft && downAmountCheck.error !== null
 
   const downReview = async (): Promise<void> => {
+    setDownAmountLeft(true)
+    if (downAmountInvalid || downAmountCheck.atomic === null) return
     setDownBusy(true)
     setDownError(null)
     try {
-      setDownPlan(await wallet.downgradePlan(toSat(downAmount)))
+      setDownPlan(await wallet.downgradePlan(downAmountCheck.atomic.toString()))
       setDownStage('review')
     } catch (e) {
       setDownError((e as Error).message)
@@ -201,11 +209,12 @@ export function Convert() {
   }
 
   const downConfirm = async (): Promise<void> => {
+    if (downAmountInvalid || downAmountCheck.atomic === null) return
     setDownBusy(true)
     setDownError(null)
     setDownStage('sending')
     try {
-      const res = await wallet.downgradeConvert(toSat(downAmount), downAddr.trim())
+      const res = await wallet.downgradeConvert(downAmountCheck.atomic.toString(), downAddr.trim())
       setDownTxid(res.txid)
       setDownStage('done')
       refresh()
@@ -252,21 +261,19 @@ export function Convert() {
       .then((i) => setMinSat(i.minConvertValueSat ?? null))
       .catch(() => {})
   }, [])
-  const belowMin = (() => {
-    if (convertAll || amount.trim() === '' || minSat === null) return false
-    try {
-      return BigInt(toSat(amount)) < BigInt(minSat)
-    } catch {
-      return false // not a number yet — the review gate has its own checks
-    }
-  })()
-
-  const showBelowMin = belowMin && amountLeft
+  const amountCheck = validateAmount(convertAll ? fromSat(confirmedSat) : amount, {
+    available: status === null ? null : BigInt(confirmedSat),
+    minimum: minSat === null ? null : BigInt(minSat),
+  })
+  const amountInvalid = amountCheck.atomic === null || amountCheck.error !== null
+  const request: UpgradeConvertRequest | null = amountInvalid || amountCheck.atomic === null
+    ? null : convertAll ? { mode: 'all' } : { mode: 'amount', amountSat: amountCheck.atomic.toString() }
+  const showAmountError = amountCheck.error !== null && (convertAll ? hasFunds : amountLeft)
   const amountHintId = useId()
   // One hint line UNDER the amount row, so its appearance never moves the row
   // itself: the minimum in manual mode, the fee note in All mode.
   const amountHint = ((): string | null => {
-    if (showBelowMin) return `Below the minimum of ${fromSat(minSat ?? '0')} ${src}.`
+    if (showAmountError) return amountCheck.error
     if (convertAll) return hasFunds ? 'The network fee is subtracted from this amount at review.' : null
     return minSat !== null ? `Minimum ${fromSat(minSat)} ${src}` : null
   })()
@@ -350,12 +357,13 @@ export function Convert() {
                       // subtracted at review, where the exact number is known).
                       value={convertAll ? (hasFunds ? fromSat(confirmedSat) : '') : amount}
                       disabled={convertAll}
-                      onChange={(e) => setAmount(e.target.value)}
+                      inputMode="decimal"
+                      onChange={(e) => { setAmount(e.target.value); setError(null) }}
                       onBlur={() => setAmountLeft(true)}
                       placeholder={convertAll ? 'Entire balance (minus network fee)' : '0.0'}
                       aria-label={`Amount in ${src}`}
                       aria-describedby={amountHint !== null ? amountHintId : undefined}
-                      state={showBelowMin ? 'error' : 'default'}
+                      state={showAmountError ? 'error' : 'default'}
                     />
                   </div>
                   {/* Same height as .field (46px) so the row lines up. */}
@@ -364,7 +372,7 @@ export function Convert() {
                   </Button>
                 </div>
                 {amountHint !== null && (
-                  <div id={amountHintId} className={showBelowMin ? 'field-hint field-hint--error' : 'field-hint'}>{amountHint}</div>
+                  <div id={amountHintId} aria-live="polite" className={showAmountError ? 'field-hint field-hint--error' : 'field-hint'}>{amountHint}</div>
                 )}
               </div>
               <TextField
@@ -382,7 +390,7 @@ export function Convert() {
                 </span>
               </Alert>
               {error !== null && <div className="field-hint field-hint--error">{error}</div>}
-              <Button size="cta" disabled={busy || !hasFunds || dest.trim() === '' || (!convertAll && amount.trim() === '') || belowMin} onClick={() => void review()}>
+              <Button size="cta" disabled={busy || !hasFunds || dest.trim() === '' || amountInvalid} onClick={() => void review()}>
                 {busy ? 'Preparing…' : hasFunds ? 'Review conversion' : `Waiting for ${src} deposit…`}
               </Button>
             </div>
@@ -546,10 +554,13 @@ export function Convert() {
                     label={`Amount (${nativeLabel})`}
                     mono
                     value={downAmount}
-                    onChange={(e) => setDownAmount(e.target.value)}
+                    inputMode="decimal"
+                    onChange={(e) => { setDownAmount(e.target.value); setDownError(null) }}
+                    onBlur={() => setDownAmountLeft(true)}
                     placeholder="0.0"
                     aria-label={`Amount in ${nativeLabel}`}
-                    hint={downAvailable > 0n ? `Up to ${fmtSat(downAvailable.toString())} ${nativeLabel} spendable (the network fee comes out of it).` : undefined}
+                    state={showDownAmountError ? 'error' : 'default'}
+                    hint={showDownAmountError ? downAmountCheck.error : downAvailable > 0n ? `Up to ${fmtSat(downAvailable.toString())} ${nativeLabel} spendable (the network fee comes out of it).` : undefined}
                   />
                   <TextField
                     label={`Receive to (${src} address)`}
@@ -563,7 +574,7 @@ export function Convert() {
                     hint={downAddrLeft && downAddr.trim() !== '' && !downAddrLooksValid ? `That does not look like a ${buildNet ?? 'mainnet'} ${src} address.` : undefined}
                   />
                   {downError !== null && <div className="field-hint field-hint--error">{downError}</div>}
-                  <Button disabled={downBusy || downAmount.trim() === '' || !downAddrLooksValid} onClick={() => void downReview()}>
+                  <Button disabled={downBusy || downAmountInvalid || coinsData === undefined || !downAddrLooksValid} onClick={() => void downReview()}>
                     {downBusy ? 'Preparing…' : 'Review'}
                   </Button>
                 </div>
@@ -727,13 +738,4 @@ function Row({ label, value, mono = false, strong = false }: { label: string; va
       </span>
     </div>
   )
-}
-
-// Parse a decimal source-coin amount (8 decimals) into satoshi as a string.
-// Invalid input becomes '0' — the plan call then reports a helpful error.
-function toSat(decimal: string): string {
-  const s = decimal.trim()
-  if (!/^\d+(\.\d{1,8})?$/.test(s)) return '0'
-  const [whole, frac = ''] = s.split('.')
-  return (BigInt(whole ?? '0') * 100_000_000n + BigInt(frac.padEnd(8, '0'))).toString()
 }

@@ -1,7 +1,8 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useId, useState, type CSSProperties, type ReactNode } from 'react'
 import type { SendPreview, TokenBalance, TokenSendPreview } from '../../shared/protocol'
 import { formatNative, formatToken, parseNative, parseToken, tokenLabels } from '../lib/format'
 import { wallet } from '../lib/wallet'
+import { validateAmount } from '../lib/amountValidation'
 import { coinSelectionShort, isInsufficientFundsError } from '../lib/sendValidation'
 import { invalidate, setContacts as cacheSetContacts, useActiveWallet, useAddressPlaceholder, useAssetLabel, useCoins, useContacts, useTokens } from '../lib/walletData'
 import { Alert, AlertIcon, Button, CheckIcon, ChevDownIcon, ChevRightIcon, CoinsIcon, ContactDialog, ContactIcon, CopyIcon, EyeIcon, Pill, PlusIcon, Screen, TextField } from '../ui'
@@ -15,6 +16,8 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
   const [stage, setStage] = useState<Stage>('form')
   const [recipient, setRecipient] = useState('')
   const [amount, setAmount] = useState('')
+  const [amountLeft, setAmountLeft] = useState(false)
+  const amountHintId = useId()
   const [preview, setPreview] = useState<SendPreview | null>(null)
   const [tokenPreview, setTokenPreview] = useState<TokenSendPreview | null>(null)
   const [txid, setTxid] = useState('')
@@ -50,17 +53,20 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
 
   const assetSym = asset !== null ? tokenLabels(asset).ticker : nativeLabel
   const decimals = asset !== null ? asset.decimals : 8
-  const parseAmount = (s: string): bigint => (asset !== null ? parseToken(s, asset.decimals) : parseNative(s))
   // "Available": for the native coin, the spendable (unfrozen) balance — matching the Coins
   // screen's "Spendable"; for a token, its full balance (the fee is a separate native amount).
-  const nativeAvailable = coinsData !== undefined ? coinsData.filter((c) => !c.frozen).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n).toString() : null
+  const nativeAvailable = coinsData !== undefined ? coinsData.filter((c) => !c.frozen && c.tokenId === undefined).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n).toString() : null
   const availableLabel = asset !== null ? `${formatToken(asset.amountAtomic, decimals)} ${assetSym}` : nativeAvailable !== null ? `${formatNative(nativeAvailable)} ${nativeLabel}` : null
+  const amountCheck = validateAmount(amount, { decimals, available: asset !== null ? BigInt(asset.amountAtomic) : nativeAvailable !== null ? BigInt(nativeAvailable) : null })
+  const amountInvalid = amountCheck.atomic === null || amountCheck.error !== null
+  const showAmountError = amountLeft && amountCheck.error !== null
 
   // Switching asset starts a fresh compose — clear the amount, fee and any errors.
   function switchAsset(next: TokenBalance | null): void {
     setAsset(next)
     setAssetMenuOpen(false)
     setAmount('')
+    setAmountLeft(false)
     setFormFee(null)
     setFeeBlocked(false)
     setFeeShort(false)
@@ -76,15 +82,7 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
   const outpoints = selectedCoins.size > 0 ? [...selectedCoins] : undefined
   const coinKey = outpoints?.join(',') ?? ''
   const pickedAtomic = spendableCoins.filter((c) => selectedCoins.has(c.outpoint)).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n)
-  let amountParsed: bigint | null = null
-  if (asset === null && amount.trim() !== '') {
-    try {
-      const a = parseNative(amount)
-      if (a > 0n) amountParsed = a
-    } catch {
-      amountParsed = null
-    }
-  }
+  const amountParsed = asset === null && !amountInvalid ? amountCheck.atomic : null
   // The full need (amount + fee) is only known once the live draft returned a
   // fee; shown in the coin-control footer. The shortfall decision itself is a
   // pure helper (unit-tested) — see sendValidation.
@@ -115,13 +113,8 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
   useEffect(() => {
     if (stage !== 'form' || maxMode) return
     const r = recipient.trim()
-    let atomic: bigint | null = null
-    try {
-      atomic = parseAmount(amount)
-    } catch {
-      atomic = null
-    }
-    if (r === '' || atomic === null || atomic <= 0n) {
+    const atomic = amountCheck.atomic
+    if (r === '' || amountInvalid || atomic === null) {
       setFormFee(null)
       setFeeLoading(false)
       setFeeBlocked(false)
@@ -130,6 +123,9 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
     }
     const value = atomic.toString()
     let active = true
+    setFormFee(null)
+    setFeeBlocked(false)
+    setFeeShort(false)
     setFeeLoading(true)
     const handle = setTimeout(() => {
       const build = asset !== null ? wallet.buildTokenSend(asset.id, r, value) : wallet.buildSend(r, value, outpoints)
@@ -164,7 +160,7 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
     // coinKey is the content-based dependency for the selected outpoints (the array
     // identity is unstable); depending on it directly would re-run every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recipient, amount, coinKey, stage, maxMode, asset])
+  }, [recipient, amount, amountInvalid, coinKey, stage, maxMode, asset])
 
   const busy = stage === 'building' || stage === 'sending'
   const matched = contacts.find((c) => c.address === recipient.trim()) ?? null
@@ -190,6 +186,8 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
 
   async function review(): Promise<void> {
     setError(null)
+    setAmountLeft(true)
+    if (amountInvalid || maxLoading || feeLoading) return
     // Token transfer: the amount is in the token's units; the fee is native coin.
     if (asset !== null) {
       let atomic: bigint
@@ -378,13 +376,17 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
                 <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--ink-700)' }}>Amount</span>
                 {availableLabel !== null && <span style={{ fontSize: 12, color: 'var(--ink-500)' }}>Available {availableLabel}</span>}
               </div>
-              <div className="field-wrap" style={{ gap: 10, height: 56, padding: '0 14px' }}>
+              <div className={showAmountError ? 'field-wrap field-wrap--error' : 'field-wrap'} style={{ gap: 10, height: 56, padding: '0 14px' }}>
                 <input
                   value={amount}
                   onChange={(e) => {
                     setAmount(e.target.value)
+                    setError(null)
                     if (maxMode) setMaxMode(false)
                   }}
+                  onBlur={() => setAmountLeft(true)}
+                  aria-invalid={showAmountError || undefined}
+                  aria-describedby={showAmountError ? amountHintId : undefined}
                   inputMode="decimal"
                   placeholder="0.00"
                   aria-label={`Amount in ${assetSym}`}
@@ -430,6 +432,7 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
                   {maxLoading ? <span className="spinner spinner--xs" aria-label="Calculating" /> : 'Max'}
                 </button>
               </div>
+              {showAmountError && <div id={amountHintId} role="alert" className="field-hint field-hint--error">{amountCheck.error}</div>}
               {assetMenuOpen && (
                 <div style={{ position: 'absolute', top: 90, right: 0, zIndex: 20, width: 168, background: 'var(--card-el)', border: '1px solid var(--border-s)', borderRadius: 11, boxShadow: 'var(--shadow)', overflow: 'hidden', padding: 4 }}>
                   {[null, ...tokens].map((a) => {
@@ -468,13 +471,13 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
               </div>
             </div>
 
-            {feeBlocked && (
+            {!amountInvalid && feeBlocked && (
               <Alert variant="warning">
                 <span style={{ fontWeight: 600, color: 'var(--ink-900)' }}>You need a little {nativeLabel} to pay the network fee.</span> Add {nativeLabel} to send tokens.
               </Alert>
             )}
 
-            {feeShort && selectedCoins.size === 0 && (
+            {!amountInvalid && feeShort && selectedCoins.size === 0 && (
               <Alert variant="warning">
                 <div>
                   <span style={{ fontWeight: 600, color: 'var(--ink-900)' }}>Amount plus the network fee exceeds your spendable balance.</span> Lower the amount, or{' '}
@@ -556,7 +559,7 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
 
             {error !== null && <div className="field-hint field-hint--error">{error}</div>}
 
-            <Button fullWidth disabled={busy || feeBlocked || feeShort || coinShort || recipient.trim().length === 0 || amount.trim().length === 0} onClick={() => void review()}>
+            <Button fullWidth disabled={busy || maxLoading || feeLoading || amountInvalid || availableLabel === null || feeBlocked || feeShort || coinShort || recipient.trim().length === 0} onClick={() => void review()}>
               {stage === 'building' ? 'Preparing…' : 'Review send'}
             </Button>
           </div>
