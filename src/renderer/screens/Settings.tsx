@@ -797,7 +797,7 @@ function AccountsCard() {
           </span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink-900)' }}>{w.label}</div>
-            {w.address !== undefined && <div style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--ink-500)' }}>{shortAddr(w.address)}</div>}
+            {w.kind !== 'seed' && w.address !== undefined && <div style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--ink-500)' }}>{shortAddr(w.address)}</div>}
           </div>
           {w.kind === 'watch' && (
             <Pill tone="watch" icon={<EyeIcon size={12} />}>

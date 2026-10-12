@@ -1,0 +1,7 @@
+{
+  "id": "omit-seed-account-address",
+  "scope": "shared",
+  "type": "fixed",
+  "bump": "patch",
+  "text": "Settings no longer shows a single address for recovery-phrase wallets, which can contain multiple addresses. Use Receive to view their addresses."
+}
