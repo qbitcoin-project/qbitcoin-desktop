@@ -1,0 +1,7 @@
+{
+  "id": "token-fee-input-selection",
+  "scope": "shared",
+  "type": "fixed",
+  "bump": "patch",
+  "text": "Token transfers correctly fund the network fee when paying it requires several small coin outputs."
+}

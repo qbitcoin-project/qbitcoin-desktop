@@ -434,6 +434,20 @@ function feeShapeForInputs(inputs: readonly SpendableUtxo[], amountAtomic: bigin
   return change > DUST_ATOMIC ? price(inputs, 2) : feeChangeless
 }
 
+/** Build, price the complete token draft, and reselect until its fee covers its
+ * own input set. Adding native fee inputs can require still more inputs. */
+export function buildTokenSendWithFee(params: Omit<BuildTokenSendParams, 'feeAtomic'>, rate: number): BuiltTokenSend {
+  let feeAtomic = 1n
+  const pool = [...params.tokenUtxos, ...params.nativeUtxos]
+  for (let pass = 0; pass < FEE_ITERATIONS; pass++) {
+    const built = buildTokenSend({ ...params, feeAtomic })
+    const required = feeForDraft(pool, built.unsigned, rate)
+    if (built.feeAtomic >= required) return built
+    feeAtomic = required
+  }
+  throw new Error('Could not settle the network fee. Select fewer coins and try again.')
+}
+
 export interface BuildTokenSendParams {
   readonly tokenHash: string
   readonly tokenUtxos: readonly SpendableTokenUtxo[]

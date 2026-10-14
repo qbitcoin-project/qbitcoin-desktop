@@ -2,10 +2,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { deserialize, falcon512KeygenFromSeed, fromHex, setSchnorrEnabled } from '@qbtc/crypto'
 import { addressFromScripthash, encodeWif } from '../../src/main/brand/crypto'
 import { SendService } from '../../src/main/wallet/SendService'
-import { buildSend, estimateSendFee, feeForDraft } from '../../src/main/wallet/buildTx'
+import { buildSend, estimateSendFee, feeForDraft, InsufficientFundsError } from '../../src/main/wallet/buildTx'
 import { importedKeyFromStored, signUnsignedTxWithKey, type ImportedKey } from '../../src/main/wallet/keyWallet'
 import type { GatheredUtxo } from '../../src/main/wallet/spendable'
 
+const TOKEN = 'ab'.repeat(32)
 const keys = new Map<string, ImportedKey>()
 beforeAll(async () => {
   setSchnorrEnabled(true)
@@ -44,7 +45,7 @@ function assertPaid(raw: string, fee: string, rate: number, coins: GatheredUtxo[
 describe('fees cover real signed transactions', () => {
   for (const algo of ['ecdsa', 'schnorr', 'falcon512'] as const) {
     for (const kind of ['ordinary'] as const) {
-      it(`${algo} ${kind}: automatic, manual and Max pay the requested rate for both output hash lengths`, async () => {
+      it(`${algo} ${kind}: automatic, manual, Max and tokens pay the requested rate for both output hash lengths`, async () => {
         const key = keys.get(`${algo}-${kind}`)!
         const rate = 5.25
         for (const hashLength of [20, 32]) {
@@ -57,11 +58,38 @@ describe('fees cover real signed transactions', () => {
             await svc.confirmSend()
             assertPaid(sent[0]!, preview.feeAtomic, rate, native)
           }
-
+          for (const amount of [100n, 500n]) {
+            const coins = [...native, { ...coin(key, 3, 0n), tokenId: TOKEN, tokenAmount: 500n }]
+            const { svc, sent } = service(key, coins, rate)
+            const preview = await svc.buildTokenSend(TOKEN, recipient, amount)
+            await svc.confirmSend()
+            assertPaid(sent[0]!, preview.feeAtomic, rate, coins)
+          }
         }
       })
     }
   }
+
+  it.each([['ecdsa', 1200n], ['falcon512', 12000n]] as const)('reselects fragmented %s fee inputs until the entire token transaction is funded', async (algo, value) => {
+    const key = keys.get(`${algo}-ordinary`)!
+    const coins = [
+      ...Array.from({ length: 30 }, (_, i) => coin(key, i + 1, value)),
+      { ...coin(key, 31, 0n), tokenId: TOKEN, tokenAmount: 500n },
+    ]
+    const { svc, sent } = service(key, coins, 5)
+    const preview = await svc.buildTokenSend(TOKEN, key.address, 100n)
+    await svc.confirmSend()
+    const tx = assertPaid(sent[0]!, preview.feeAtomic, 5, coins)
+    expect(tx.inputs.length).toBeGreaterThanOrEqual(4)
+  })
+
+  it('rejects a token draft whose inputs cover the initial estimate but cannot pay their own final size', async () => {
+    const key = keys.get('falcon512-ordinary')!
+    const coins = [coin(key, 1, 12000n), { ...coin(key, 2, 0n), tokenId: TOKEN, tokenAmount: 500n }]
+    const { svc, sent } = service(key, coins, 5)
+    await expect(svc.buildTokenSend(TOKEN, key.address, 100n)).rejects.toThrow(InsufficientFundsError)
+    expect(sent).toEqual([])
+  })
 
   it('covers the input-count varint transition at 253 inputs', async () => {
     const key = keys.get('ecdsa-ordinary')!

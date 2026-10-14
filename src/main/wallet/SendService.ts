@@ -1,5 +1,5 @@
 import type { MaxSendable, SendPreview, SendResult, TokenSendPreview } from '../../shared/protocol'
-import { buildSend, buildTokenSend, estimateSendFee, feeForInputs, InsufficientFundsError, InsufficientTokensError, selectByToken, selectCoins, type ChangeBranch, type SpendableTokenUtxo, type SpendableUtxo, type UnsignedTx } from './buildTx'
+import { buildSend, buildTokenSendWithFee, estimateSendFee, InsufficientFundsError, type ChangeBranch, type SpendableTokenUtxo, type SpendableUtxo, type UnsignedTx } from './buildTx'
 import type { GatheredUtxo } from './spendable'
 import type { SignedTx } from './signTx'
 
@@ -120,41 +120,29 @@ export class SendService {
 
   // Build and hold a token transfer. Token UTXOs of the chosen token cover the
   // amount (with token change to self); unfrozen native coin pays the fee (token
-  // UTXOs are value 0). The fee covers the whole tx, so it's computed in two passes:
-  // estimate from the token inputs, pick native coins to cover that, then recompute from the
-  // real input set. Holds the draft for confirmSend; advances both change branches.
+  // UTXOs are value 0). Price each complete draft until its native inputs pay for
+  // the final transaction. Holds it for confirmSend; advances both change branches.
   async buildTokenSend(tokenId: string, recipient: string, tokenAmount: bigint): Promise<TokenSendPreview> {
     const all = await this.deps.gather()
     const frozen = await this.deps.frozen()
     const tokenUtxos: SpendableTokenUtxo[] = all
       .filter((u) => u.tokenId === tokenId && u.tokenAmount !== undefined)
-      .map((u) => ({ txid: u.txid, vout: u.vout, value: u.value, chain: u.chain, index: u.index, algo: u.algo, scheme: u.scheme, tokenAmount: u.tokenAmount as bigint }))
+      .map((u) => ({ ...u, tokenAmount: u.tokenAmount as bigint }))
     const nativeUtxos = all.filter((u) => u.tokenId === undefined && !frozen.has(outpointOf(u)))
 
     const rate = await this.deps.feeRate()
-    const tokenSel = selectByToken(tokenUtxos, tokenAmount)
-    if (tokenSel === null) {
-      throw new InsufficientTokensError(tokenAmount, tokenUtxos.reduce((s, u) => s + u.tokenAmount, 0n))
-    }
-    let feeAtomic = feeForInputs(tokenSel, rate, 3)
-    for (let pass = 0; pass < 2; pass++) {
-      const nativeSel = selectCoins(nativeUtxos, feeAtomic)
-      if (nativeSel === null) break // buildTokenSend throws the precise "need native coins for fee" error
-      feeAtomic = feeForInputs([...tokenSel, ...nativeSel], rate, 3)
-    }
 
     const [classicalChange, pqChange] = await Promise.all([this.deps.getChangeAddress(), this.deps.getPqChangeAddress()])
     const changeFor = (algo: ChangeBranch): string => (algo === 'falcon512' ? pqChange : classicalChange)
-    const built = buildTokenSend({
+    const built = buildTokenSendWithFee({
       tokenHash: tokenId,
       tokenUtxos,
       nativeUtxos,
       recipient,
       tokenAmount,
-      feeAtomic,
       tokenChangeAddressFor: changeFor,
       nativeChangeAddressFor: changeFor,
-    })
+    }, rate)
     this.pending = {
       unsigned: built.unsigned,
       advance: [...new Set([built.tokenChangeAlgo, built.nativeChangeAlgo].filter((a): a is ChangeBranch => a !== undefined))],
