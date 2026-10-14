@@ -42,6 +42,7 @@ for (const algo of ['ecdsa', 'falcon512'] as const) {
       await dialog.getByLabel('Private key', { exact: true }).fill(fixture.wif)
       await expect(dialog.getByText('Delegated staking', { exact: true })).toBeVisible()
       await expect(dialog.locator('code')).toHaveText([address, encodeDelegatePubkeyhash(fixture.delegate, 'mainnet')])
+      expect(await dialog.locator('code').evaluateAll((elements) => getComputedStyle(elements[0]!).fontFamily === getComputedStyle(elements[1]!).fontFamily)).toBe(true)
       await dialog.getByRole('button', { name: 'Add wallet', exact: true }).click()
       await expect(dialog).toHaveCount(0)
       await expect(page.locator('.wallet-switch')).toContainText('Delegated owner')

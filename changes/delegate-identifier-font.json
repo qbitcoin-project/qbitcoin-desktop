@@ -1,0 +1,7 @@
+{
+  "id": "delegate-identifier-font",
+  "scope": "shared",
+  "type": "fixed",
+  "bump": "patch",
+  "text": "Delegate identifiers use the same monospace font as wallet addresses."
+}
