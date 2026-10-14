@@ -1,5 +1,6 @@
 import { useEffect, useId, useState, type CSSProperties, type ReactNode } from 'react'
 import type { SendPreview, TokenBalance, TokenSendPreview } from '../../shared/protocol'
+import { isMature } from '../../shared/maturity'
 import { formatNative, formatToken, parseNative, parseToken, tokenLabels } from '../lib/format'
 import { wallet } from '../lib/wallet'
 import { validateAmount } from '../lib/amountValidation'
@@ -54,10 +55,15 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
 
   const assetSym = asset !== null ? tokenLabels(asset).ticker : nativeLabel
   const decimals = asset !== null ? asset.decimals : 8
-  const nativeAvailable = coinsData !== undefined ? coinsData.filter((c) => !c.frozen && c.tokenId === undefined).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n).toString() : null
-  const tokenAvailable = asset !== null && coinsData !== undefined ? coinsData.filter((c) => c.tokenId === asset.id && !c.frozen).reduce((sum, c) => sum + BigInt(c.tokenAmountAtomic ?? '0'), 0n) : null
+  const nativeAvailable = coinsData !== undefined ? coinsData.filter((c) => !c.frozen && c.tokenId === undefined && isMature(c)).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n).toString() : null
+  const tokenAvailable = asset !== null && coinsData !== undefined ? coinsData.filter((c) => c.tokenId === asset.id && !c.frozen && isMature(c)).reduce((sum, c) => sum + BigInt(c.tokenAmountAtomic ?? '0'), 0n) : null
   const availableLabel = asset !== null ? tokenAvailable !== null ? `${formatToken(tokenAvailable.toString(), decimals)} ${assetSym}` : null : nativeAvailable !== null ? `${formatNative(nativeAvailable)} ${nativeLabel}` : null
-  const amountCheck = validateAmount(amount, { decimals, available: asset !== null ? tokenAvailable : nativeAvailable !== null ? BigInt(nativeAvailable) : null })
+  const manualAvailable = asset === null && selectedCoins.size > 0 ? (coinsData ?? []).filter((c) => selectedCoins.has(c.outpoint) && !c.frozen && !c.maturityUnknown && c.tokenId === undefined).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n) : null
+  const amountCheck = validateAmount(amount, { decimals, available: asset !== null ? tokenAvailable : manualAvailable ?? (nativeAvailable !== null ? BigInt(nativeAvailable) : null) })
+  const assetCoins = (coinsData ?? []).filter((c) => !c.frozen && c.tokenId === (asset?.id ?? undefined))
+  const maturing = assetCoins.filter((c) => !c.maturityUnknown && !isMature(c))
+  const maturingAmount = maturing.reduce((s, c) => s + BigInt(asset === null ? c.valueAtomic : c.tokenAmountAtomic ?? '0'), 0n)
+  const nextMaturesAt = maturing.length > 0 ? Math.min(...maturing.map((c) => c.maturesAt!)) : undefined
   const amountInvalid = amountCheck.atomic === null || amountCheck.error !== null
   const showAmountError = amountLeft && amountCheck.error !== null
 
@@ -78,7 +84,7 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
 
   // Coin-control derivations (native-coin sends only). `outpoints` drives the build:
   // a manual selection spends exactly those; an empty one lets main auto-select.
-  const spendableCoins = (coinsData ?? []).filter((c) => c.tokenId === undefined && !c.frozen)
+  const spendableCoins = (coinsData ?? []).filter((c) => c.tokenId === undefined && !c.frozen && !c.maturityUnknown)
   const outpoints = selectedCoins.size > 0 ? [...selectedCoins] : undefined
   const coinKey = outpoints?.join(',') ?? ''
   const pickedAtomic = spendableCoins.filter((c) => selectedCoins.has(c.outpoint)).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n)
@@ -375,7 +381,7 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
             <div style={{ position: 'relative' }}>
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: 7 }}>
                 <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--ink-700)' }}>Amount</span>
-                {availableLabel !== null && <span style={{ fontSize: 12, color: 'var(--ink-500)' }}>Available {availableLabel}</span>}
+                {availableLabel !== null && <span style={{ fontSize: 12, color: 'var(--ink-500)' }}>Available now {availableLabel}</span>}
               </div>
               <div className={showAmountError ? 'field-wrap field-wrap--error' : 'field-wrap'} style={{ gap: 10, height: 56, padding: '0 14px' }}>
                 <input
@@ -416,7 +422,7 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
                   disabled={maxLoading || (asset !== null && tokenAvailable === null)}
                   onClick={() => {
                     if (asset !== null) {
-                      // Only unfrozen tokens can be selected; native coin pays the fee.
+                      // Only mature, unfrozen tokens can be selected; native coin pays the fee.
                       setAmount(formatToken((tokenAvailable ?? 0n).toString(), asset.decimals))
                       return
                     }
@@ -465,12 +471,15 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
                 <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink-900)' }}>
                   Network fee{asset !== null && <span style={{ fontWeight: 500, color: 'var(--ink-500)' }}> · paid in {nativeLabel}</span>}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--ink-500)', marginTop: 1 }}>Confirms in ~10s</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-500)', marginTop: 1 }}>Confirmation time depends on the network and input maturity.</div>
               </div>
               <div style={{ fontSize: 13, fontWeight: 600, fontFamily: 'var(--mono)', color: 'var(--ink-700)' }}>
                 {feeLoading ? '…' : formFee !== null ? `${formatNative(formFee)} ${nativeLabel}` : '—'}
               </div>
             </div>
+
+            {nextMaturesAt !== undefined && <Alert variant="caution"><span>Maturing: {asset === null ? formatNative(maturingAmount.toString()) : formatToken(maturingAmount.toString(), decimals)} {assetSym}. Next available at {new Date(nextMaturesAt * 1000).toLocaleString()}. These coins are excluded unless you select them manually.</span></Alert>}
+            {assetCoins.some((c) => c.maturityUnknown) && <Alert variant="warning">Some coins are excluded because their maturity could not be verified. Refresh the coin list before sending them.</Alert>}
 
             {!amountInvalid && feeBlocked && (
               <Alert variant="warning">
@@ -531,6 +540,7 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
                               {c.algo === 'falcon512' && <Pill tone="pq">PQ</Pill>}
                             </div>
                             <div style={{ fontSize: 11, color: 'var(--ink-500)', fontFamily: 'var(--mono)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.address}</div>
+                            {!isMature(c) && <div style={{ fontSize: 12, color: 'var(--warning)' }}>Matures at {new Date(c.maturesAt! * 1000).toLocaleString()} — confirmation will wait</div>}
                           </div>
                           <div style={{ fontSize: 13, fontWeight: 600, fontFamily: 'var(--mono)', fontVariantNumeric: 'tabular-nums', color: 'var(--ink-900)' }}>{formatNative(c.valueAtomic)} {nativeLabel}</div>
                         </button>
@@ -600,7 +610,8 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
                 </>
               ) : null}
             </div>
-            {error !== null && <div className="field-hint field-hint--error">{error}</div>}
+            {preview?.maturesAt !== undefined && <Alert variant="caution">Selected coins are still maturing. This transaction cannot confirm before {new Date(preview.maturesAt * 1000).toLocaleString()}.</Alert>}
+            {error !== null && <div role="alert" className="field-hint field-hint--error">{error}</div>}
             <div style={{ display: 'flex', gap: 10 }}>
               <Button
                 variant="secondary"
@@ -624,7 +635,7 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '40px 20px' }}>
             <span className="spinner" />
             <div style={{ marginTop: 18, fontSize: 16, fontWeight: 600, fontFamily: 'var(--display-font)', color: 'var(--ink-900)' }}>Broadcasting transaction…</div>
-            <div style={{ marginTop: 6, fontSize: 13, color: 'var(--ink-500)' }}>Signed with ECDSA · sending to the network</div>
+            <div role="status" style={{ marginTop: 6, fontSize: 13, color: 'var(--ink-500)' }}>Submitting or checking the transaction with the network.</div>
           </div>
         )}
 

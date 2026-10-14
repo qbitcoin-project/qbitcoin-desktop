@@ -336,6 +336,8 @@ export interface FeeBands {
 }
 
 export interface SendPreview {
+  /** Earliest confirmation time for explicitly selected staking outputs. */
+  readonly maturesAt?: number
   readonly recipient: string
   readonly amountAtomic: string
   readonly feeAtomic: string
@@ -369,6 +371,8 @@ export interface MaxSendable {
 
 // A coin-control row: one UTXO with display fields and local metadata.
 export interface UtxoView {
+  readonly maturesAt?: number
+  readonly maturityUnknown?: boolean
   readonly outpoint: string
   readonly address: string
   readonly valueAtomic: string
@@ -426,6 +430,10 @@ export interface SweepScan {
   readonly address: string
   readonly balanceAtomic: string
   readonly delegatePubkeyhash?: string
+  readonly availableAtomic?: string
+  readonly maturingAtomic?: string
+  readonly nextMaturesAt?: number
+  readonly maturityUnknown?: boolean
 }
 
 export interface WalletInfo {

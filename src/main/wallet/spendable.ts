@@ -1,5 +1,6 @@
 import type { Utxo } from '@qbtc/chain'
 import type { SpendableUtxo } from './buildTx'
+import type { MaturityInfo } from '../../shared/maturity'
 import { discoverAll, isActive, type AddressLookup, type Algo, type DeriveAddress, type DiscoveredAddress } from './discovery'
 
 /** Chain access the spendable gatherer needs. */
@@ -9,7 +10,7 @@ export interface SpendableBackend extends AddressLookup {
 
 /** A spendable UTXO enriched with coin-control fields (owning address +
  *  confirmation state). Still assignable to SpendableUtxo for tx building. */
-export interface GatheredUtxo extends SpendableUtxo {
+export interface GatheredUtxo extends SpendableUtxo, MaturityInfo {
   readonly address: string
   readonly confirmed: boolean
   readonly blockHeight?: number

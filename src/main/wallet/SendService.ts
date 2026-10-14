@@ -2,6 +2,7 @@ import type { MaxSendable, SendPreview, SendResult, TokenSendPreview } from '../
 import { buildSend, buildTokenSendWithFee, estimateSendFee, InsufficientFundsError, type ChangeBranch, type SpendableTokenUtxo, type SpendableUtxo, type UnsignedTx } from './buildTx'
 import type { GatheredUtxo } from './spendable'
 import type { SignedTx } from './signTx'
+import { isMature } from '../../shared/maturity'
 
 // Dependencies, injected so the service is testable without crypto or network.
 export interface SendDeps {
@@ -69,6 +70,8 @@ export class SendService {
     const algos = new Set(built.unsigned.inputs.map((i) => i.algo))
     const signature = [...algos].map((a) => (a === 'falcon512' ? 'Falcon-512' : a === 'schnorr' ? 'Schnorr' : 'ECDSA')).join(' + ')
     return {
+      ...(manualInputs !== undefined && manualInputs.some((u) => !isMature(u))
+        ? { maturesAt: Math.max(...manualInputs.map((u) => u.maturesAt ?? 0)) } : {}),
       recipient,
       amountAtomic: built.amountAtomic.toString(),
       feeAtomic: built.feeAtomic.toString(),
@@ -95,9 +98,10 @@ export class SendService {
       if (manual.length !== wanted.size) {
         throw new Error('Some selected coins are no longer available.')
       }
+      if (manual.some((u) => u.maturityUnknown === true)) throw new Error('Could not verify when some selected coins become spendable. Refresh and try again.')
       return { utxos: [], manualInputs: manual }
     }
-    return { utxos: all.filter((u) => !frozen.has(outpointOf(u))) }
+    return { utxos: all.filter((u) => !frozen.has(outpointOf(u)) && isMature(u)) }
   }
 
   // The largest amount sendable in one transaction: the whole spendable pool (or
@@ -126,9 +130,9 @@ export class SendService {
     const all = await this.deps.gather()
     const frozen = await this.deps.frozen()
     const tokenUtxos: SpendableTokenUtxo[] = all
-      .filter((u) => u.tokenId === tokenId && u.tokenAmount !== undefined && !frozen.has(outpointOf(u)))
+      .filter((u) => u.tokenId === tokenId && u.tokenAmount !== undefined && !frozen.has(outpointOf(u)) && isMature(u))
       .map((u) => ({ ...u, tokenAmount: u.tokenAmount as bigint }))
-    const nativeUtxos = all.filter((u) => u.tokenId === undefined && !frozen.has(outpointOf(u)))
+    const nativeUtxos = all.filter((u) => u.tokenId === undefined && !frozen.has(outpointOf(u)) && isMature(u))
 
     const rate = await this.deps.feeRate()
 

@@ -146,4 +146,38 @@ describe('SendService', () => {
     expect(preview.changeAtomic).toBe('0')
     expect(preview.amountAtomic).toBe(max.amountAtomic)
   })
+
+  it('excludes maturing and unverified outputs from automatic selection and Max', async () => {
+    const mature = utxo('mature', 0, 5_000_000n)
+    const { svc, calls } = harness([mature,
+      { ...utxo('future', 0, 10_000_000n), maturesAt: Date.now() / 1000 + 3600 },
+      { ...utxo('unknown', 0, 20_000_000n), maturityUnknown: true },
+    ])
+    expect(await svc.maxSendable()).toEqual(await harness([mature]).svc.maxSendable())
+    await svc.buildSend(RECIPIENT, 1_000_000n)
+    await svc.confirmSend()
+    expect(calls.signed[0]!.inputs.map((i) => i.prevTxid)).toEqual(['mature'])
+    await expect(svc.buildSend(RECIPIENT, 6_000_000n)).rejects.toThrow(/Not enough balance/)
+  })
+
+  it('allows explicit maturing inputs with a preview deadline but refuses unverified inputs', async () => {
+    const maturesAt = Math.floor(Date.now() / 1000) + 3600
+    const { svc } = harness([{ ...utxo('future', 0, 5_000_000n), maturesAt }, { ...utxo('unknown', 0, 9_000_000n), maturityUnknown: true }])
+    expect((await svc.buildSend(RECIPIENT, 1_000_000n, ['future:0'])).maturesAt).toBe(maturesAt)
+    const max = await svc.maxSendable(['future:0'])
+    expect(BigInt(max.amountAtomic) + BigInt(max.feeAtomic)).toBe(5_000_000n)
+    await expect(svc.buildSend(RECIPIENT, 1_000_000n, ['unknown:0'])).rejects.toThrow(/verify when/)
+  })
+
+  it('excludes maturing token outputs and native fee inputs', async () => {
+    const maturesAt = Date.now() / 1000 + 3600
+    const { svc, calls } = harness([
+      { ...tutxo('future-token', 0, 100n), maturesAt }, tutxo('token', 0, 10n),
+      { ...utxo('future-native', 0, 9_000_000n), maturesAt }, utxo('native', 0, 1_000_000n),
+    ])
+    await expect(svc.buildTokenSend(TOKEN, RECIPIENT, 11n)).rejects.toThrow(/Not enough of this token/)
+    await svc.buildTokenSend(TOKEN, RECIPIENT, 5n)
+    await svc.confirmSend()
+    expect(calls.signed[0]!.inputs.map((i) => i.prevTxid).sort()).toEqual(['native', 'token'])
+  })
 })

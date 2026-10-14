@@ -1,5 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react'
 import type { UtxoView } from '../../shared/protocol'
+import { isMature } from '../../shared/maturity'
 import { formatNative, formatToken, tokenLabels } from '../lib/format'
 import { wallet } from '../lib/wallet'
 import { invalidate, mutateCoins, useAssetLabel, useCoins, useTokens } from '../lib/walletData'
@@ -88,13 +89,14 @@ export function Coins({ onSendSelected }: { onSendSelected: (outpoints: string[]
   // Native stats are native-only: a token UTXO has a zero native value and is shown as
   // its own row, never counted as spendable/frozen native value or as a native coin.
   const nativeCoins = list.filter((c) => c.tokenId === undefined)
-  const total = nativeCoins.reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n)
   const frozenTotal = nativeCoins.filter((c) => c.frozen).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n)
+  const spendableTotal = nativeCoins.filter((c) => !c.frozen && isMature(c)).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n)
+  const maturingTotal = nativeCoins.filter((c) => !c.frozen && !c.maturityUnknown && !isMature(c)).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n)
   const selectedTotal = nativeCoins.filter((c) => selected.has(c.outpoint)).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n)
 
   const q = search.trim().toLowerCase()
   const filtered = list.filter((c) => {
-    if (filter === 'spendable' && c.frozen) return false
+    if (filter === 'spendable' && (c.frozen || !isMature(c))) return false
     if (filter === 'frozen' && !c.frozen) return false
     if (filter === 'tokens' && c.tokenId === undefined) return false
     if (q !== '' && !(c.address.toLowerCase().includes(q) || (c.label ?? '').toLowerCase().includes(q))) return false
@@ -106,7 +108,8 @@ export function Coins({ onSendSelected }: { onSendSelected: (outpoints: string[]
       <div style={{ padding: 40, maxWidth: 880, width: '100%', margin: '0 auto' }}>
         {/* Stats */}
         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 18 }}>
-          <StatCard label="Spendable" value={formatNative((total - frozenTotal).toString())} unit minWidth={160} />
+          <StatCard label="Spendable" value={formatNative(spendableTotal.toString())} unit minWidth={160} />
+          {maturingTotal > 0n && <StatCard label="Maturing" value={formatNative(maturingTotal.toString())} unit minWidth={160} />}
           <StatCard label="Frozen" value={formatNative(frozenTotal.toString())} unit minWidth={160} tone="frozen" icon={<SnowIcon size={13} />} />
           <StatCard label="Coins" value={String(nativeCoins.length)} minWidth={120} />
         </div>
@@ -245,7 +248,7 @@ function CoinRow({
   const primary = coin.label ?? coin.address
   // Token UTXOs aren't selectable for coin-control (which builds a native send); they
   // can still be labelled and frozen.
-  const selectable = !coin.frozen && tokenAsset === undefined
+  const selectable = !coin.frozen && !coin.maturityUnknown && tokenAsset === undefined
   return (
     <div className="coin-row" style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '12px 16px', borderTop: '1px solid var(--border)', boxShadow: `inset 3px 0 0 ${coin.frozen ? 'var(--frozen)' : 'transparent'}` }}>
       <button
@@ -254,7 +257,7 @@ function CoinRow({
         disabled={!selectable}
         aria-label="Select coin"
         aria-pressed={selected}
-        title={tokenAsset !== undefined ? 'Tokens are sent from the Tokens panel, not coin control' : coin.frozen ? 'Frozen — unfreeze to select' : undefined}
+        title={tokenAsset !== undefined ? 'Tokens are sent from the Tokens panel, not coin control' : coin.frozen ? 'Frozen — unfreeze to select' : coin.maturityUnknown ? 'Maturity could not be verified' : !isMature(coin) ? 'Maturing — confirmation will wait' : undefined}
         style={{ flex: 'none', width: 20, height: 20, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: selectable ? 'pointer' : 'not-allowed', color: 'var(--on-primary)', border: selected ? 'none' : '1.5px solid var(--border-s)', background: selected ? 'var(--primary)' : 'transparent', opacity: selectable ? 1 : 0.4 }}
       >
         {selected && <CheckIcon size={13} />}
@@ -300,6 +303,7 @@ function CoinRow({
           {tokenAsset !== undefined ? `${formatToken(coin.tokenAmountAtomic ?? '0', tokenAsset.decimals)} ${tokenAsset.ticker}` : `${formatNative(coin.valueAtomic)} ${asset}`}
         </div>
         <div style={{ fontSize: 11.5, marginTop: 2, color: coin.confirmations > 0 ? 'var(--ink-500)' : 'var(--warning)' }}>{coin.confirmations > 0 ? `${String(coin.confirmations)} conf` : 'Pending'}</div>
+        {!isMature(coin) && <div style={{ fontSize: 12, color: 'var(--warning)', marginTop: 4 }}>{coin.maturityUnknown ? 'Maturity unavailable' : `Matures at ${new Date(coin.maturesAt! * 1000).toLocaleString()}`}</div>}
       </div>
 
       <button

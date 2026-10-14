@@ -32,6 +32,8 @@ export class CoinService {
         algo: u.algo,
         label: entry.label,
         frozen: entry.frozen ?? false,
+        ...(u.maturesAt !== undefined ? { maturesAt: u.maturesAt } : {}),
+        ...(u.maturityUnknown === true ? { maturityUnknown: true } : {}),
       }
       return u.tokenId !== undefined ? { ...view, tokenId: u.tokenId, tokenAmountAtomic: (u.tokenAmount ?? 0n).toString() } : view
     })

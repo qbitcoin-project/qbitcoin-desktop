@@ -3,6 +3,11 @@ const query = new URLSearchParams(window.location.search)
 const address = 'classical-test-address'
 const coin = { outpoint: 'aa:0', address, valueAtomic: '100000000', confirmations: 10, algo: 'ecdsa', frozen: false }
 const token = { id: 'token-test', name: 'Test Token', symbol: 'TOK', decimals: 2, amountAtomic: '500' }
+const maturesAt = Math.floor(Date.now() / 1000) + 3600
+const maturingCoins = query.has('maturity') ? [
+  { ...coin, outpoint: 'dd:0', valueAtomic: '200000000', maturesAt, label: 'Maturing stake' },
+  { ...coin, outpoint: 'ee:0', valueAtomic: '0', tokenId: token.id, tokenAmountAtomic: '700', maturesAt },
+] : []
 const wallets = [{ id: 'main', label: 'Main Wallet', kind: query.has('key') ? 'key' : 'seed', active: true, canSign: true, removable: false, address }]
 if (query.has('accounts')) wallets.push({ id: 'imported', label: 'Imported key', kind: 'key', active: false, canSign: true, removable: true, address: 'single-key-test-address' })
 const calls = []
@@ -23,7 +28,7 @@ const methods = {
   listContacts: () => [],
   listTokens: () => [token],
   listCoins: () => [coin, { ...coin, outpoint: 'bb:0', valueAtomic: '900000000', frozen: true },
-    { ...coin, outpoint: 'cc:0', valueAtomic: '0', tokenId: token.id, tokenAmountAtomic: token.amountAtomic }],
+    { ...coin, outpoint: 'cc:0', valueAtomic: '0', tokenId: token.id, tokenAmountAtomic: token.amountAtomic }, ...maturingCoins],
   getReceiveAddress: (algo = 'ecdsa') => algo === 'falcon512' ? 'falcon-test-address' : address,
   upgradeInfo: () => ({ enabled: true, minConvertValueSat: '10000' }),
   upgradeStatus: () => ({
@@ -37,9 +42,10 @@ const methods = {
   downgradeInfo: () => ({ enabled: true }),
   downgradeStatus: () => [],
   downgradePlan: (amountAtomic) => ({ amountAtomic, feeAtomic: '1000', estimatedBtcSat: '10000', level: 1 }),
-  buildSend: (recipient, amountAtomic) => {
-    if (BigInt(amountAtomic) + 1000n > 100000000n) throw new Error('Not enough balance to cover this amount plus the network fee.')
-    return { recipient, amountAtomic, feeAtomic: '1000', totalAtomic: (BigInt(amountAtomic) + 1000n).toString(), changeAtomic: '0', signature: 'ECDSA' }
+  buildSend: (recipient, amountAtomic, outpoints) => {
+    const future = outpoints?.includes('dd:0')
+    if (BigInt(amountAtomic) + 1000n > (future ? 200000000n : 100000000n)) throw new Error('Not enough balance to cover this amount plus the network fee.')
+    return { recipient, amountAtomic, feeAtomic: '1000', totalAtomic: (BigInt(amountAtomic) + 1000n).toString(), changeAtomic: '0', signature: 'ECDSA', ...(future ? { maturesAt } : {}) }
   },
   buildTokenSend: (tokenId, recipient, tokenAmountAtomic) => ({ tokenId, recipient, tokenAmountAtomic, feeAtomic: '1000', signature: 'ECDSA' }),
   maxSendable: () => ({ amountAtomic: '99999000', feeAtomic: '1000' }),

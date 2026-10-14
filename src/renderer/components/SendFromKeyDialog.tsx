@@ -130,7 +130,7 @@ function SendFromKeyForm({ onClose }: { onClose: () => void }) {
     onClose()
   }
 
-  const emptyBalance = scanned !== null && BigInt(scanned.balanceAtomic) === 0n
+  const emptyBalance = scanned !== null && BigInt(scanned.availableAtomic ?? scanned.balanceAtomic) === 0n
 
   const footer =
     step === 'key' ? (
@@ -220,10 +220,12 @@ function SendFromKeyForm({ onClose }: { onClose: () => void }) {
             {scanned.delegatePubkeyhash && <DelegationNotice delegatePubkeyhash={scanned.delegatePubkeyhash} />}
             <div style={{ background: 'var(--well)', border: '1px solid var(--border)', borderRadius: 12, padding: '11px 13px', display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                <span style={{ fontSize: 11.5, color: 'var(--ink-500)' }}>Balance on this key</span>
-                <span style={{ fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: 'var(--ink-900)' }}>{formatNative(scanned.balanceAtomic)} {asset}</span>
+                <span style={{ fontSize: 11.5, color: 'var(--ink-500)' }}>Available now</span>
+                <span style={{ fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: 'var(--ink-900)' }}>{formatNative(scanned.availableAtomic ?? scanned.balanceAtomic)} {asset}</span>
               </div>
               <code style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--ink-500)', wordBreak: 'break-all' }}>{scanned.address}</code>
+              {scanned.nextMaturesAt !== undefined && <span style={{ fontSize: 12, color: 'var(--warning)' }}>Maturing: {formatNative(scanned.maturingAtomic ?? '0')} {asset}. Next available at {new Date(scanned.nextMaturesAt * 1000).toLocaleString()}.</span>}
+              {scanned.maturityUnknown && <span style={{ fontSize: 12, color: 'var(--warning)' }}>Some coins are excluded because their maturity could not be verified.</span>}
             </div>
             {emptyBalance ? (
               <Alert variant="caution">
@@ -252,7 +254,7 @@ function SendFromKeyForm({ onClose }: { onClose: () => void }) {
                     {sendMax ? 'Max ✓' : 'Max'}
                   </Button>
                 </div>
-                {sendMax && <div style={{ fontSize: 12, color: 'var(--ink-500)', lineHeight: 1.5 }}>Sweeping the entire balance — the exact amount after the fee appears on review.</div>}
+                {sendMax && <div style={{ fontSize: 12, color: 'var(--ink-500)', lineHeight: 1.5 }}>Sweeping the available, mature balance — the exact amount after the fee appears on review.</div>}
               </>
             )}
             {error !== null && <div className="field-hint field-hint--error">{error}</div>}
@@ -268,7 +270,7 @@ function SendFromKeyForm({ onClose }: { onClose: () => void }) {
               {preview.changeAtomic !== '0' && <ReviewRow label="Change" value={`${formatNative(preview.changeAtomic)} ${asset} — returns to the key's address`} />}
               <ReviewRow label="Signature" value={preview.signature} />
             </div>
-            {sendMax && <div style={{ fontSize: 12, color: 'var(--ink-500)', lineHeight: 1.5 }}>Full sweep: the address is emptied, no change output, and the key is wiped after sending.</div>}
+            {sendMax && <div style={{ fontSize: 12, color: 'var(--ink-500)', lineHeight: 1.5 }}>All available, mature coins are sent without change. Maturing coins remain at the source address. The key is wiped after sending.</div>}
             {error !== null && <div className="field-hint field-hint--error">{error}</div>}
           </>
         )}

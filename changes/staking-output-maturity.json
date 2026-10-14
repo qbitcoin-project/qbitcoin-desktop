@@ -1,0 +1,7 @@
+{
+  "id": "staking-output-maturity",
+  "scope": "shared",
+  "type": "fixed",
+  "bump": "patch",
+  "text": "Send, private-key sweeps and coin control show maturing staking funds and their availability time. Automatic selection, including Max without a manual selection, excludes maturing or unverified coins. Manually selected maturing coins show a confirmation delay warning."
+}

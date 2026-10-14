@@ -31,6 +31,8 @@ import { SendService } from '../wallet/SendService'
 import { deriveInputKeypair, signUnsignedTx } from '../wallet/signTx'
 import { SnapshotStore } from '../wallet/snapshot'
 import { gatherFromActive, type GatheredUtxo } from '../wallet/spendable'
+import { withMaturity } from '../wallet/maturity'
+import { isMature } from '../../shared/maturity'
 import { UpgradeService, type ConvertPlan, type ConvertRequest } from '../wallet/UpgradeService'
 import { UpgradeCreditLookup } from '../wallet/UpgradeCreditLookup'
 import { DowngradeService, type ReclaimKeyCell } from '../wallet/DowngradeService'
@@ -235,7 +237,7 @@ export function createWalletCore(): WalletCore {
       const at = Date.now()
       // Reuse the chain service's shared, de-duplicated discovery — no second gap-scan.
       const promise = (async () => {
-        const gathered = await gatherFromActive(await chain.spendableAddresses(), chainClient)
+        const gathered = await withMaturity(await gatherFromActive(await chain.spendableAddresses(), chainClient), chainClient, NETWORK)
         const inputBytes = keyProvider === null ? undefined : keyInputBytes(await keyProvider())
         return inputBytes === undefined ? gathered : gathered.map((u) => ({ ...u, inputBytes }))
       })()
@@ -353,7 +355,7 @@ export function createWalletCore(): WalletCore {
           spendable: async () => {
             const frozen = await frozenSet()
             return (await gatherAll())
-              .filter((u) => u.tokenId === undefined)
+              .filter((u) => u.tokenId === undefined && isMature(u))
               .filter((u) => !frozen.has(`${u.txid}:${String(u.vout)}`))
           },
           covenantAddress: (scripthash) => addressFromScripthash(scripthash, NETWORK),

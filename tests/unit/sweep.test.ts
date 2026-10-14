@@ -28,6 +28,8 @@ function backend(key: ImportedKey, utxos: readonly Utxo[], onBroadcast?: (hex: s
         : { address, chain: ZERO, mempool: ZERO, tokens: {} },
     getAddressTransactions: async () => [],
     getTransaction: async (txid: string) => {
+      const source = utxos.find((coin) => coin.txid === txid)
+      if (source) return { txid, version: 1, size: 200, fee: 0n, vin: [], vout: [], status: source.status }
       throw new Error(`no tx ${txid}`)
     },
     getTransactionHex: async () => '00',

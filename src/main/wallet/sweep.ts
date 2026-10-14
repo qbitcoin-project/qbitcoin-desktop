@@ -5,6 +5,8 @@ import { createKeyAddressSource, keyInputBytes, signUnsignedTxWithKey, type Impo
 import { SendService } from './SendService'
 import { gatherFromActive, type GatheredUtxo } from './spendable'
 import { encodeDelegatePubkeyhash } from './delegation'
+import { withMaturity } from './maturity'
+import { isMature } from '../../shared/maturity'
 import type { SweepScan } from '../../shared/protocol'
 
 // Ephemeral "send from a private key" (sweep) session.
@@ -45,7 +47,7 @@ export function createSweepSession(backend: SweepBackend, key: ImportedKey, netw
   const source = createKeyAddressSource(() => Promise.resolve(key))
   const chain = new ChainService(backend, source.branches)
   const inputBytes = keyInputBytes(key)
-  const gather = async (): Promise<GatheredUtxo[]> => (await gatherFromActive(await chain.spendableAddresses(), backend))
+  const gather = async (): Promise<GatheredUtxo[]> => (await withMaturity(await gatherFromActive(await chain.spendableAddresses(), backend), backend, network))
     .map((u) => inputBytes === undefined ? u : { ...u, inputBytes })
 
   const ownAddress = (): Promise<string> => Promise.resolve(key.address)
@@ -67,7 +69,17 @@ export function createSweepSession(backend: SweepBackend, key: ImportedKey, netw
     address: key.address,
     ...(key.delegation !== undefined ? { delegatePubkeyhash: encodeDelegatePubkeyhash(key.delegation.delegatePubkeyhash, network) } : {}),
     send,
-    scanBalance: async () => ({ balanceAtomic: (await chain.getSummary()).balanceAtomic }),
+    scanBalance: async () => {
+      const [summary, coins] = await Promise.all([chain.getSummary(), gather()])
+      const native = coins.filter((c) => c.tokenId === undefined)
+      const maturing = native.filter((c) => c.maturityUnknown !== true && !isMature(c))
+      return { balanceAtomic: summary.balanceAtomic,
+        availableAtomic: native.filter((c) => isMature(c)).reduce((s, c) => s + c.value, 0n).toString(),
+        maturingAtomic: maturing.reduce((s, c) => s + c.value, 0n).toString(),
+        ...(maturing.length > 0 ? { nextMaturesAt: Math.min(...maturing.map((c) => c.maturesAt!)) } : {}),
+        ...(native.some((c) => c.maturityUnknown) ? { maturityUnknown: true } : {}),
+      }
+    },
     dispose: () => {
       send.reset()
       key.privateKey.fill(0)
