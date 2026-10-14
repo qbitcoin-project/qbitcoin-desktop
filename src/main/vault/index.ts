@@ -16,9 +16,8 @@ import { AddressService, type WalletVault } from '../wallet/AddressService'
 import { createSeedAddressSource, type AddressSource } from '../wallet/AddressSource'
 import { KeyStore } from '../wallet/keyStore'
 import { ImportedKeySession } from '../wallet/ImportedKeySession'
-import { createKeyAddressSource, importedKeyFromStored, inspectWifKey, keyInputBytes, keyReceiveOps, signUnsignedTxWithKey, type ImportedKey } from '../wallet/keyWallet'
+import { createKeyAddressSource, importedKeyFromStored, importedKeyFromWif, inspectWifKey, keyInputBytes, keyReceiveOps, signUnsignedTxWithKey, type ImportedKey } from '../wallet/keyWallet'
 import { encodeDelegatePubkeyhash } from '../wallet/delegation'
-import { decodeWalletWif } from '../wallet/keyWif'
 import { SeedStore } from '../wallet/seedStore'
 import { WalletBackupService } from '../wallet/WalletBackupService'
 import { createSweepSession } from '../wallet/sweep'
@@ -556,14 +555,10 @@ export function createWalletCore(): WalletCore {
   // Sealing needs the app-data key, so the wallet must be unlocked. Does not switch.
   const addKeyWallet = async (label: string, wif: string, algoHint?: AddressAlgo): Promise<readonly WalletInfo[]> => {
     const cleanWif = wif.trim()
-    const { payload, candidates } = decodeWalletWif(cleanWif, NETWORK)
-    payload.fill(0) // only the candidate list is needed here
-    const algo = algoHint ?? candidates[0]
-    if (algo === undefined || !candidates.includes(algo)) throw new Error('That key cannot be used with the chosen algorithm.')
-    if (algo === 'schnorr' && !isSchnorrEnabled()) throw new Error('Schnorr keys are not enabled yet.')
-
-    const key = await importedKeyFromStored({ wif: cleanWif, algo, address: '' }, NETWORK)
+    const key = await importedKeyFromWif(cleanWif, NETWORK, algoHint)
     key.privateKey.fill(0) // the session re-materializes on demand
+    const algo = key.algo
+    if (algo === 'schnorr' && !isSchnorrEnabled()) throw new Error('Schnorr keys are not enabled yet.')
     for (const info of await listWallets()) {
       if (info.address === key.address) throw new Error('This key is already covered by one of your wallets.')
     }
@@ -587,14 +582,12 @@ export function createWalletCore(): WalletCore {
   const sweepScan = async (wif: string, sessionId: string, algoHint?: AddressAlgo): Promise<SweepScan> => {
     return sweepSlot.scan(sessionId, async () => {
       const cleanWif = wif.trim()
-      const { payload, candidates } = decodeWalletWif(cleanWif, NETWORK)
-      payload.fill(0)
-      const algo = algoHint ?? candidates[0]
-      if (algo === undefined || !candidates.includes(algo)) throw new Error('That key cannot be used with the chosen algorithm.')
-      if (algo === 'schnorr' && !isSchnorrEnabled()) throw new Error('Schnorr keys are not enabled yet.')
-      const key = await importedKeyFromStored({ wif: cleanWif, algo, address: '' }, NETWORK)
+      const key = await importedKeyFromWif(cleanWif, NETWORK, algoHint)
       // Snapshot the current chain client so a mid-wizard node change can't repoint it.
-      try { return createSweepSession(chainClient, key, NETWORK) }
+      try {
+        if (key.algo === 'schnorr' && !isSchnorrEnabled()) throw new Error('Schnorr keys are not enabled yet.')
+        return createSweepSession(chainClient, key, NETWORK)
+      }
       catch (error) { key.privateKey.fill(0); throw error }
     })
   }

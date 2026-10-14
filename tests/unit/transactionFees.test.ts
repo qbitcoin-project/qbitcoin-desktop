@@ -4,7 +4,7 @@ import { addressFromScripthash, encodeWif } from '../../src/main/brand/crypto'
 import { SendService } from '../../src/main/wallet/SendService'
 import { buildSend, estimateSendFee, feeForDraft, InsufficientFundsError } from '../../src/main/wallet/buildTx'
 import { decodeWalletWif } from '../../src/main/wallet/keyWif'
-import { importedKeyFromStored, keyInputBytes, signUnsignedTxWithKey, type ImportedKey } from '../../src/main/wallet/keyWallet'
+import { importedKeyFromWif, keyInputBytes, signUnsignedTxWithKey, type ImportedKey } from '../../src/main/wallet/keyWallet'
 import type { GatheredUtxo } from '../../src/main/wallet/spendable'
 import { delegatedKeyFixture } from '../fixtures/delegatedKey'
 
@@ -14,11 +14,11 @@ beforeAll(async () => {
   setSchnorrEnabled(true)
   for (const algo of ['ecdsa', 'schnorr', 'falcon512'] as const) {
     const { wif } = await delegatedKeyFixture(algo)
-    keys.set(`${algo}-delegated`, await importedKeyFromStored({ wif, algo, address: '' }, 'mainnet'))
+    keys.set(`${algo}-delegated`, await importedKeyFromWif(wif, 'mainnet', algo))
     const decoded = decodeWalletWif(wif, 'mainnet')
     const ordinary = encodeWif(decoded.payload, 'mainnet')
     decoded.payload.fill(0)
-    keys.set(`${algo}-ordinary`, await importedKeyFromStored({ wif: ordinary, algo, address: '' }, 'mainnet'))
+    keys.set(`${algo}-ordinary`, await importedKeyFromWif(ordinary, 'mainnet', algo))
   }
 })
 afterAll(() => { for (const key of keys.values()) key.privateKey.fill(0); setSchnorrEnabled(false) })

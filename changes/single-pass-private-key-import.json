@@ -1,0 +1,7 @@
+{
+  "id": "single-pass-private-key-import",
+  "scope": "shared",
+  "type": "changed",
+  "bump": "patch",
+  "text": "Reduce delays when checking, importing or sending from a private key by decoding its WIF only once per operation."
+}

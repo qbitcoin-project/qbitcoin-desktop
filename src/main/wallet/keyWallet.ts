@@ -24,7 +24,7 @@ import type { AddressSource } from './AddressSource'
 import type { UnsignedTx } from './buildTx'
 import type { StoredKey } from './keyStore'
 import { toCryptoTransaction, type SignedTx } from './signTx'
-import { decodeWalletWif } from './keyWif'
+import { decodeWalletWif, type WalletWif } from './keyWif'
 import { delegationAddress, delegationScript, encodeDelegatePubkeyhash, ownerPubkeyhash } from './delegation'
 import { serializedInputBytes, signaturePlaceholder } from './txSize'
 
@@ -58,7 +58,17 @@ export interface ImportedKey {
  * Async: a Falcon key runs its pair self-check in WASM.
  */
 export async function importedKeyFromStored(stored: StoredKey, network: Network): Promise<ImportedKey> {
-  const { payload, candidates, delegatePubkeyhash } = decodeWalletWif(stored.wif, network)
+  return materializeKey(stored, decodeWalletWif(stored.wif, network), network)
+}
+
+/** Choose the algorithm and materialize a pasted key from the same decode. */
+export async function importedKeyFromWif(wif: string, network: Network, algoHint?: Algorithm): Promise<ImportedKey> {
+  const decoded = decodeWalletWif(wif, network)
+  return materializeKey({ wif, algo: algoHint ?? decoded.candidates[0]!, address: '' }, decoded, network)
+}
+
+async function materializeKey(stored: StoredKey, decoded: WalletWif, network: Network): Promise<ImportedKey> {
+  const { payload, candidates, delegatePubkeyhash } = decoded
   if (!candidates.includes(stored.algo)) {
     payload.fill(0)
     throw new Error(`This key cannot be used as ${stored.algo}.`)

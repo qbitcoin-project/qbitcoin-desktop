@@ -2,7 +2,6 @@ import {
   decodeBase58Check, FALCON512_KEYPAIR_BYTES, isValidPrivateKey,
   WifError, WifNetworkError, type DecodedWif, type Network,
 } from '@qbtc/crypto'
-import { decodeWif } from '../brand/crypto'
 import { PROFILE } from '../brand/profile'
 import { DELEGATION } from '../brand/delegation'
 
@@ -10,14 +9,15 @@ export interface WalletWif extends DecodedWif {
   readonly delegatePubkeyhash?: Uint8Array
 }
 
-/** Validate ordinary and delegated WIF envelopes. Returned private bytes belong to the caller. */
+/** Decode once, then validate the ordinary or delegated envelope. Ordinary
+ * payload rules match the crypto WIF codec, including compressed-key rejection.
+ * All returned private bytes belong to the caller. */
 export function decodeWalletWif(wif: string, network: Network): WalletWif {
   let decoded: ReturnType<typeof decodeBase58Check>
   try { decoded = decodeBase58Check(wif.trim(), 1) }
   catch { throw new WifError('Not a valid WIF string: invalid Base58 or checksum.') }
   const { payload, version } = decoded
   try {
-    if (version[0] === PROFILE.wifVersion.mainnet || version[0] === PROFILE.wifVersion.testnet) return decodeWif(wif.trim(), network)
     const detected = (['mainnet', 'testnet'] as const).find((n) =>
       version[0] === PROFILE.wifVersion[n] || version[0] === DELEGATION[n].wifHash160 || version[0] === DELEGATION[n].wifHash256)
     if (detected === undefined) throw new WifError(`Unknown WIF version byte 0x${version[0]!.toString(16).padStart(2, '0')}.`)
