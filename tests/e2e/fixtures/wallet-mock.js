@@ -11,6 +11,8 @@ const maturingCoins = query.has('maturity') ? [
 const wallets = [{ id: 'main', label: 'Main Wallet', kind: query.has('key') ? 'key' : 'seed', active: true, canSign: true, removable: false, address }]
 if (query.has('accounts')) wallets.push({ id: 'imported', label: 'Imported key', kind: 'key', active: false, canSign: true, removable: true, address: 'single-key-test-address' })
 const calls = []
+let submissions = 0
+let unresolved = query.get('submission') === 'existing'
 const transaction = { txid: 'ab'.repeat(32), direction: 'in', amountAtomic: '100000000', feeAtomic: '1000', confirmed: true, blockTime: 1700000000 }
 window.walletUiTest = { calls, depositAvailable: true, creditState: query.get('credit') ?? 'pending' }
 const conversion = { txid: 'aa'.repeat(32), lockValueSat: '1000000', destScripthashHex: '29'.repeat(32), confirmed: true, confirmations: 9 }
@@ -43,12 +45,26 @@ const methods = {
   downgradeStatus: () => [],
   downgradePlan: (amountAtomic) => ({ amountAtomic, feeAtomic: '1000', estimatedBtcSat: '10000', level: 1 }),
   buildSend: (recipient, amountAtomic, outpoints) => {
+    if (unresolved) throw Object.assign(new Error('Resolve the previous submission before building another transaction.'), { name: 'SendUncertainError' })
     const future = outpoints?.includes('dd:0')
     if (BigInt(amountAtomic) + 1000n > (future ? 200000000n : 100000000n)) throw new Error('Not enough balance to cover this amount plus the network fee.')
     return { recipient, amountAtomic, feeAtomic: '1000', totalAtomic: (BigInt(amountAtomic) + 1000n).toString(), changeAtomic: '0', signature: 'ECDSA', ...(future ? { maturesAt } : {}) }
   },
+  confirmSend: () => {
+    if (submissions++ === 0 && ['rejected', 'unknown'].includes(query.get('submission'))) {
+      unresolved = query.get('submission') === 'unknown'
+      throw Object.assign(new Error(unresolved ? 'The submission status is unknown.' : 'The node rejected this transaction.'), { name: unresolved ? 'SendUncertainError' : 'SendNeedsReviewError' })
+    }
+    unresolved = false
+    return { txid: 'ab'.repeat(32) }
+  },
   buildTokenSend: (tokenId, recipient, tokenAmountAtomic) => ({ tokenId, recipient, tokenAmountAtomic, feeAtomic: '1000', signature: 'ECDSA' }),
   maxSendable: () => ({ amountAtomic: '99999000', feeAtomic: '1000' }),
+  inspectKey: () => ({ candidates: ['ecdsa'], addresses: { ecdsa: address }, delegatePubkeyhash: 'synthetic-delegate-public-hash' }),
+  sweepScan: () => ({ address, balanceAtomic: '300000000', availableAtomic: '100000000', maturingAtomic: '200000000', nextMaturesAt: maturesAt, delegatePubkeyhash: 'synthetic-delegate-public-hash' }),
+  sweepCancel: () => {},
+  sweepBuild: (recipient, amountAtomic, sendMax) => methods.buildSend(recipient, sendMax ? '99999000' : amountAtomic),
+  sweepConfirm: () => methods.confirmSend(),
 }
 export const wallet = Object.fromEntries(Object.entries(methods).map(([method, fn]) => [method, async (...args) => {
   calls.push({ method, args })

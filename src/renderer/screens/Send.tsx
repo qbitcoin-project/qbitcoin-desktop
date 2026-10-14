@@ -1,6 +1,7 @@
 import { useEffect, useId, useState, type CSSProperties, type ReactNode } from 'react'
 import type { SendPreview, TokenBalance, TokenSendPreview } from '../../shared/protocol'
 import { isMature } from '../../shared/maturity'
+import { sendRecovery } from '../../shared/sendErrors'
 import { formatNative, formatToken, parseNative, parseToken, tokenLabels } from '../lib/format'
 import { wallet } from '../lib/wallet'
 import { validateAmount } from '../lib/amountValidation'
@@ -24,6 +25,7 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
   const [tokenPreview, setTokenPreview] = useState<TokenSendPreview | null>(null)
   const [txid, setTxid] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [recovery, setRecovery] = useState<'review' | 'retry'>('retry')
   // The asset being sent: null = native coin, otherwise a token. The entry point
   // pre-selects it (hero → native coin, Tokens panel → that token); it's switchable here.
   const [asset, setAsset] = useState<TokenBalance | null>(token)
@@ -145,6 +147,12 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
         })
         .catch((e: unknown) => {
           if (active) {
+            if (e instanceof Error && e.name === 'SendUncertainError') {
+              setError(e.message)
+              setRecovery('retry')
+              setStage('failed')
+              return
+            }
             setFormFee(null)
             const msg = e instanceof Error ? e.message : ''
             // Native send the pool / manual selection can't fund — surface it NOW
@@ -213,7 +221,8 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
         setStage('review')
       } catch (e) {
         setError((e as Error).message)
-        setStage('form')
+        setStage(e instanceof Error && e.name === 'SendUncertainError' ? 'failed' : 'form')
+        setRecovery('retry')
       }
       return
     }
@@ -225,7 +234,8 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
         setStage('review')
       } catch (e) {
         setError((e as Error).message)
-        setStage('form')
+        setStage(e instanceof Error && e.name === 'SendUncertainError' ? 'failed' : 'form')
+        setRecovery('retry')
       }
       return
     }
@@ -246,7 +256,8 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
       setStage('review')
     } catch (e) {
       setError((e as Error).message)
-      setStage('form')
+      setStage(e instanceof Error && e.name === 'SendUncertainError' ? 'failed' : 'form')
+      setRecovery('retry')
     }
   }
 
@@ -261,6 +272,8 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
       invalidate('summary', 'history', 'coins')
     } catch (e) {
       setError((e as Error).message)
+      setRecovery(sendRecovery(e))
+      invalidate('summary', 'history', 'coins')
       setStage('failed')
     }
   }
@@ -677,24 +690,16 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
             <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 60, height: 60, borderRadius: '50%', background: 'color-mix(in srgb, var(--danger) 16%, transparent)', color: 'var(--danger)' }}>
               <AlertIcon size={28} />
             </span>
-            <div style={{ marginTop: 18, fontSize: 20, fontWeight: 600, fontFamily: 'var(--display-font)', color: 'var(--ink-900)' }}>Couldn&apos;t broadcast</div>
+            <div role="alert" style={{ marginTop: 18, fontSize: 20, fontWeight: 600, fontFamily: 'var(--display-font)', color: 'var(--ink-900)' }}>{recovery === 'review' ? 'Review required' : 'Check submission status'}</div>
             <div style={{ marginTop: 10, fontSize: 13.5, color: 'var(--ink-500)', lineHeight: 1.5 }}>
-              The network didn&apos;t accept the transaction. Nothing left your wallet — your balance is unchanged.
+              {recovery === 'review' ? 'The node rejected this transaction. Review fresh coins and the updated fee before sending again.' : 'The transaction may already be on the network. Checking again will look it up or resend the same transaction.'}
             </div>
             {error !== null && <div style={{ marginTop: 8, fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--ink-300)', wordBreak: 'break-all' }}>{error}</div>}
-            <Button size="cta" fullWidth onClick={() => void confirm()} style={{ marginTop: 18 }}>
-              Try again
-            </Button>
-            <Button
-              variant="secondary"
-              fullWidth
-              onClick={() => {
-                setStage('review')
-                setError(null)
-              }}
-              style={{ marginTop: 10 }}
-            >
-              Back to details
+            <Button size="cta" fullWidth onClick={() => {
+              if (recovery === 'retry') void confirm()
+              else { setPreview(null); setTokenPreview(null); setSelectedCoins(new Set()); setFormFee(null); setMaxMode(false); setError(null); setStage('form') }
+            }} style={{ marginTop: 18 }}>
+              {recovery === 'review' ? 'Review again' : 'Check again'}
             </Button>
           </div>
         )}

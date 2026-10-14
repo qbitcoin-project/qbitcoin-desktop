@@ -63,6 +63,7 @@ export function createSweepSession(backend: SweepBackend, key: ImportedKey, netw
     advanceChange: () => Promise.resolve(),
     sign: (unsigned) => signUnsignedTxWithKey(unsigned, key, network),
     broadcast: async (rawHex) => (await backend.broadcastTransaction(rawHex)).txid,
+    isKnownTransaction: async (txid) => (await backend.getTransaction(txid)).txid === txid,
   })
 
   return {

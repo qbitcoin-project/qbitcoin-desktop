@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { ChainError } from '@qbtc/chain'
 import { SendService, type SendDeps } from '../../src/main/wallet/SendService'
 import type { GatheredUtxo } from '../../src/main/wallet/spendable'
 import type { UnsignedTx } from '../../src/main/wallet/buildTx'
@@ -179,5 +180,131 @@ describe('SendService', () => {
     await svc.buildTokenSend(TOKEN, RECIPIENT, 5n)
     await svc.confirmSend()
     expect(calls.signed[0]!.inputs.map((i) => i.prevTxid).sort()).toEqual(['native', 'token'])
+  })
+})
+
+describe('send submission recovery', () => {
+  const rejected = () => new ChainError('broadcast_rejected', 'Inputs already spent', { status: 400 })
+  const timeout = () => new ChainError('timeout', 'Request timed out')
+
+  it('invalidates inputs and discards a definitely rejected draft before a fresh review', async () => {
+    const { svc, deps, calls } = harness([utxo('old', 0, 5_000_000n)])
+    const invalidate = vi.fn(() => { deps.gather = async () => [utxo('fresh', 0, 6_000_000n)] })
+    deps.onBroadcastFailure = invalidate
+    deps.isKnownTransaction = async () => false
+    const broadcast = deps.broadcast
+    deps.broadcast = async () => { throw rejected() }
+    await svc.buildSend(RECIPIENT, 1_000_000n)
+    await expect(svc.confirmSend()).rejects.toMatchObject({ name: 'SendNeedsReviewError' })
+    await expect(svc.confirmSend()).rejects.toThrow(/No transaction/)
+    expect(invalidate).toHaveBeenCalledOnce()
+    expect(calls.advance).toBe(0)
+    deps.broadcast = broadcast
+    await svc.buildSend(RECIPIENT, 1_000_000n)
+    await svc.confirmSend()
+    expect(calls.signed[1]!.inputs.map((i) => i.prevTxid)).toEqual(['fresh'])
+  })
+
+  it('recognizes an accepted transaction after a timeout without resending it', async () => {
+    const { svc, deps, calls } = harness([utxo('a', 0, 5_000_000n)])
+    deps.broadcast = vi.fn(async () => { throw timeout() })
+    deps.isKnownTransaction = vi.fn(async () => true)
+    await svc.buildSend(RECIPIENT, 1_000_000n)
+    expect(await svc.confirmSend()).toEqual({ txid: 'tx123' })
+    expect(deps.isKnownTransaction).toHaveBeenCalledWith('tx123')
+    expect(deps.broadcast).toHaveBeenCalledOnce()
+    expect(calls.sign).toBe(1)
+    expect(calls.advance).toBe(1)
+  })
+
+  it('retains exact signed bytes across uncertain retries and forbids replacing the draft', async () => {
+    const { svc, deps } = harness([utxo('a', 0, 5_000_000n)])
+    let signatures = 0
+    deps.sign = async () => ({ rawHex: `wire-${++signatures}`, txid: `id-${signatures}` })
+    deps.broadcast = vi.fn().mockRejectedValueOnce(timeout()).mockResolvedValue('id-1')
+    deps.isKnownTransaction = async () => false
+    deps.onBroadcastFailure = vi.fn()
+    await svc.buildSend(RECIPIENT, 1_000_000n)
+    await expect(svc.confirmSend()).rejects.toMatchObject({ name: 'SendUncertainError' })
+    await expect(svc.buildSend(RECIPIENT, 2_000_000n)).rejects.toThrow(/previous submission/)
+    await expect(svc.buildTokenSend(TOKEN, RECIPIENT, 1n)).rejects.toThrow(/previous submission/)
+    expect(await svc.confirmSend()).toEqual({ txid: 'id-1' })
+    expect(deps.broadcast).toHaveBeenNthCalledWith(1, 'wire-1')
+    expect(deps.broadcast).toHaveBeenNthCalledWith(2, 'wire-1')
+    expect(signatures).toBe(1)
+    expect(deps.onBroadcastFailure).toHaveBeenCalledOnce()
+  })
+
+  it('checks a previously uncertain txid before retrying broadcast', async () => {
+    const { svc, deps, calls } = harness([utxo('a', 0, 5_000_000n)])
+    deps.broadcast = vi.fn(async () => { throw timeout() })
+    deps.isKnownTransaction = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+    await svc.buildSend(RECIPIENT, 1_000_000n)
+    await expect(svc.confirmSend()).rejects.toMatchObject({ name: 'SendUncertainError' })
+    expect(await svc.confirmSend()).toEqual({ txid: 'tx123' })
+    expect(deps.broadcast).toHaveBeenCalledOnce()
+    expect(calls.sign).toBe(1)
+  })
+
+  it('does not interpret a rejection after a timeout as proof that the first attempt failed', async () => {
+    const { svc, deps, calls } = harness([utxo('a', 0, 5_000_000n)])
+    deps.broadcast = vi.fn().mockRejectedValueOnce(timeout()).mockRejectedValueOnce(rejected())
+    deps.isKnownTransaction = async () => { throw new Error('lookup unavailable') }
+    await svc.buildSend(RECIPIENT, 1_000_000n)
+    await expect(svc.confirmSend()).rejects.toMatchObject({ name: 'SendUncertainError' })
+    await expect(svc.confirmSend()).rejects.toMatchObject({ name: 'SendUncertainError' })
+    await expect(svc.buildSend(RECIPIENT, 2_000_000n)).rejects.toThrow(/previous submission/)
+    expect(calls.sign).toBe(1)
+    expect(calls.advance).toBe(0)
+  })
+
+  it('shares an in-flight confirmation and advances change once', async () => {
+    const { svc, calls } = harness([utxo('a', 0, 5_000_000n)])
+    await svc.buildSend(RECIPIENT, 1_000_000n)
+    const first = svc.confirmSend()
+    expect(svc.confirmSend()).toBe(first)
+    await first
+    expect(calls.sign).toBe(1)
+    expect(calls.broadcast).toHaveLength(1)
+    expect(calls.advance).toBe(1)
+  })
+
+  it('never broadcasts a signature that finishes after the send session ends', async () => {
+    const { svc, deps, calls } = harness([utxo('a', 0, 5_000_000n)])
+    let finish!: () => void
+    const gate = new Promise<void>((resolve) => { finish = resolve })
+    const sign = deps.sign
+    deps.sign = async (draft) => { await gate; return sign(draft) }
+    await svc.buildSend(RECIPIENT, 1_000_000n)
+    const pending = svc.confirmSend()
+    svc.reset()
+    finish()
+    await expect(pending).rejects.toThrow(/session has ended/)
+    expect(calls.broadcast).toHaveLength(0)
+  })
+
+  it('retries local bookkeeping without rebroadcasting an accepted transaction', async () => {
+    const { svc, deps, calls } = harness([utxo('a', 0, 5_000_000n)])
+    deps.advanceChange = vi.fn().mockRejectedValueOnce(new Error('Disk unavailable')).mockResolvedValue(undefined)
+    await svc.buildSend(RECIPIENT, 1_000_000n)
+    await expect(svc.confirmSend()).rejects.toThrow(/Disk unavailable/)
+    await expect(svc.buildSend(RECIPIENT, 2_000_000n)).rejects.toThrow(/previous submission/)
+    expect(await svc.confirmSend()).toEqual({ txid: 'tx123' })
+    expect(calls.broadcast).toHaveLength(1)
+    expect(calls.sign).toBe(1)
+  })
+
+  it('does not let an older asynchronous preview replace the latest draft', async () => {
+    const { svc, deps, calls } = harness([utxo('a', 0, 5_000_000n)])
+    let finish!: () => void
+    const gate = new Promise<void>((resolve) => { finish = resolve })
+    const gather = deps.gather
+    deps.gather = vi.fn().mockImplementationOnce(async () => { await gate; return gather() }).mockImplementation(gather)
+    const old = svc.buildSend(RECIPIENT, 1_000_000n)
+    await svc.buildSend(RECIPIENT, 2_000_000n)
+    finish()
+    await expect(old).rejects.toThrow(/no longer current/)
+    await svc.confirmSend()
+    expect(calls.signed[0]!.outputs[0]!.valueAtomic).toBe('2000000')
   })
 })

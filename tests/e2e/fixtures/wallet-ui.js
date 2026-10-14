@@ -3,6 +3,7 @@ import './bridge-mock'
 import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import { WalletShell } from '../../../src/renderer/screens/WalletShell'
+import { SendFromKeyDialog } from '../../../src/renderer/components/SendFromKeyDialog'
 import { brand } from '../../../src/renderer/brand'
 import '../../../src/renderer/styles/app.css'
 
@@ -14,4 +15,4 @@ if (query.has('credits')) {
   brand.upgrade.sourceExplorerTxUrl = { mainnet: 'https://source.example/tx/', testnet: 'https://source-test.example/tx/' }
   brand.explorerTxUrl = query.has('no-explorer') ? null : 'https://native.example/tx/'
 }
-createRoot(document.getElementById('root')).render(createElement(WalletShell))
+createRoot(document.getElementById('root')).render(query.has('sweep') ? createElement(SendFromKeyDialog, { open: true, onClose: () => {} }) : createElement(WalletShell))

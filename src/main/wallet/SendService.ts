@@ -2,7 +2,9 @@ import type { MaxSendable, SendPreview, SendResult, TokenSendPreview } from '../
 import { buildSend, buildTokenSendWithFee, estimateSendFee, InsufficientFundsError, type ChangeBranch, type SpendableTokenUtxo, type SpendableUtxo, type UnsignedTx } from './buildTx'
 import type { GatheredUtxo } from './spendable'
 import type { SignedTx } from './signTx'
+import { ChainError } from '@qbtc/chain'
 import { isMature } from '../../shared/maturity'
+import { SendNeedsReviewError, SendUncertainError } from '../../shared/sendErrors'
 
 // Dependencies, injected so the service is testable without crypto or network.
 export interface SendDeps {
@@ -22,6 +24,10 @@ export interface SendDeps {
   broadcast(rawHex: string): Promise<string>
   /** Called after a successful broadcast so a cached spend pool can be dropped. */
   onSpent?(): void
+  /** Invalidate cached inputs after any broadcast failure. */
+  onBroadcastFailure?(): void
+  /** True only when the exact locally signed transaction is known by the node. */
+  isKnownTransaction?(txid: string): Promise<boolean>
 }
 
 const outpointOf = (u: SpendableUtxo): string => `${u.txid}:${String(u.vout)}`
@@ -35,11 +41,16 @@ const outpointOf = (u: SpendableUtxo): string => `${u.txid}:${String(u.vout)}`
 export class SendService {
   // The held draft: the unsigned tx plus which change branches to advance on confirm
   // (one for a native send; up to two — token + native — for a token send).
-  private pending: { unsigned: UnsignedTx; advance: readonly ChangeBranch[]; recipient: string } | null = null
+  private pending: { unsigned: UnsignedTx; advance: readonly ChangeBranch[]; recipient: string;
+    signed?: SignedTx; uncertain?: boolean; accepted?: boolean; advanced?: number } | null = null
+  private confirming: Promise<SendResult> | null = null
+  private generation = 0
 
   constructor(private readonly deps: SendDeps) {}
 
   async buildSend(recipient: string, amountAtomic: bigint, outpoints?: readonly string[], sendMax = false): Promise<SendPreview> {
+    this.startBuild()
+    const generation = this.generation
     const { utxos, manualInputs } = await this.resolveInputs(outpoints)
     const rate = await this.deps.feeRate()
     // One estimator for every path (auto / manual / send-max), sized to the
@@ -61,6 +72,7 @@ export class SendService {
       sendMax,
       changeAddressFor,
     })
+    this.checkBuild(generation)
     this.pending = {
       unsigned: built.unsigned,
       advance: built.changeAtomic > 0n && built.changeAlgo !== undefined ? [built.changeAlgo] : [],
@@ -127,6 +139,8 @@ export class SendService {
   // UTXOs are value 0). Price each complete draft until its native inputs pay for
   // the final transaction. Holds it for confirmSend; advances both change branches.
   async buildTokenSend(tokenId: string, recipient: string, tokenAmount: bigint): Promise<TokenSendPreview> {
+    this.startBuild()
+    const generation = this.generation
     const all = await this.deps.gather()
     const frozen = await this.deps.frozen()
     const tokenUtxos: SpendableTokenUtxo[] = all
@@ -147,6 +161,7 @@ export class SendService {
       tokenChangeAddressFor: changeFor,
       nativeChangeAddressFor: changeFor,
     }, rate)
+    this.checkBuild(generation)
     this.pending = {
       unsigned: built.unsigned,
       advance: [...new Set([built.tokenChangeAlgo, built.nativeChangeAlgo].filter((a): a is ChangeBranch => a !== undefined))],
@@ -163,16 +178,64 @@ export class SendService {
     }
   }
 
-  async confirmSend(): Promise<SendResult> {
+  confirmSend(): Promise<SendResult> {
+    if (this.confirming !== null) return this.confirming
+    const running = this.confirm()
+    this.confirming = running
+    void running.then(() => { if (this.confirming === running) this.confirming = null }, () => { if (this.confirming === running) this.confirming = null })
+    return running
+  }
+
+  private async confirm(): Promise<SendResult> {
     const pending = this.pending
     if (pending === null) {
       throw new Error('No transaction to confirm. Build a send first.')
     }
-    const signed = await this.deps.sign(pending.unsigned)
-    await this.deps.broadcast(signed.rawHex)
-    this.deps.onSpent?.()
-    for (const algo of pending.advance) {
-      await this.deps.advanceChange(algo)
+    const generation = this.generation
+    const check = (): void => {
+      if (generation !== this.generation || this.pending !== pending) throw new Error('The send session has ended. Review the transaction again.')
+    }
+    // A retry must retain the exact wire bytes: Falcon signatures are randomized,
+    // so signing the same draft again can produce a different transaction id.
+    pending.signed ??= await this.deps.sign(pending.unsigned)
+    check()
+    const signed = pending.signed
+    const known = async (): Promise<boolean> => {
+      try { return await this.deps.isKnownTransaction?.(signed.txid) === true } catch { return false }
+    }
+    if (!pending.accepted) {
+      const wasUncertain = pending.uncertain === true
+      if (wasUncertain && await known()) pending.accepted = true
+      check()
+      if (!pending.accepted) {
+        try {
+          await this.deps.broadcast(signed.rawHex)
+          pending.accepted = true
+        } catch (error) {
+          this.deps.onBroadcastFailure?.()
+          if (await known()) pending.accepted = true
+          check()
+          if (!pending.accepted) {
+            const rejected = error instanceof ChainError &&
+              (error.code === 'invalid_argument' || (error.code === 'broadcast_rejected' && (error.status === 400 || error.status === 422)))
+            if (rejected && !wasUncertain) {
+              this.pending = null
+              throw new SendNeedsReviewError('The node rejected this transaction. Refresh the available coins and review a new transaction before sending.')
+            }
+            pending.uncertain = true
+            throw new SendUncertainError(`The submission status is unknown. Check again to look up or resend the same transaction (${signed.txid}).`)
+          }
+        }
+      }
+      check()
+      this.deps.onSpent?.()
+    }
+    // Accepted transactions are never broadcast again if updating local change
+    // metadata fails; a retry only finishes that bookkeeping.
+    while ((pending.advanced ?? 0) < pending.advance.length) {
+      await this.deps.advanceChange(pending.advance[pending.advanced ?? 0]!)
+      check()
+      pending.advanced = (pending.advanced ?? 0) + 1
     }
     this.pending = null
     return { txid: signed.txid }
@@ -180,6 +243,19 @@ export class SendService {
 
   /** Drop any held draft (e.g. on lock/destroy). */
   reset(): void {
+    this.generation++
     this.pending = null
+    this.confirming = null
+  }
+
+  private startBuild(): void {
+    if (this.pending?.uncertain || this.pending?.accepted) throw new SendUncertainError(`Resolve the previous submission before building another transaction (${this.pending.signed!.txid}).`)
+    if (this.confirming !== null) throw new Error('A transaction is already being sent.')
+    this.generation++
+    this.pending = null
+  }
+
+  private checkBuild(generation: number): void {
+    if (generation !== this.generation) throw new Error('This transaction preview is no longer current. Review it again.')
   }
 }

@@ -1,0 +1,7 @@
+{
+  "id": "transaction-submission-recovery",
+  "scope": "shared",
+  "type": "fixed",
+  "bump": "patch",
+  "text": "Rejected sends refresh the available coins and require a new review. When submission status is uncertain, checking again looks up or resends the same signed transaction without creating a new transaction ID."
+}

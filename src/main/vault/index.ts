@@ -268,6 +268,7 @@ export function createWalletCore(): WalletCore {
       )
     }
     const broadcast = async (rawHex: string): Promise<string> => (await chainClient.broadcastTransaction(rawHex)).txid
+    const isKnownTransaction = async (txid: string): Promise<boolean> => (await chainClient.getTransaction(txid)).txid === txid
     let sendSvc: SendService | null = null
     if (seedAddrSvc !== null && seedMasterKey !== null) {
       const sa = seedAddrSvc
@@ -283,6 +284,8 @@ export function createWalletCore(): WalletCore {
         broadcast,
         // A spend changes the UTXO set, so drop the memoised pool immediately.
         onSpent: bustGather,
+        onBroadcastFailure: bustGather,
+        isKnownTransaction,
       })
     } else if (keyProvider !== null) {
       const getKey = keyProvider
@@ -300,6 +303,8 @@ export function createWalletCore(): WalletCore {
         sign: async (unsigned) => signUnsignedTxWithKey(unsigned, await getKey(), NETWORK),
         broadcast,
         onSpent: bustGather,
+        onBroadcastFailure: bustGather,
+        isKnownTransaction,
       })
     }
     const send: SendOps = sendSvc ?? watchOnlySend()

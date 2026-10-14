@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { AddressAlgo, SendPreview, SweepScan } from '../../shared/protocol'
+import { sendRecovery } from '../../shared/sendErrors'
 import { DelegationNotice } from './DelegationNotice'
 import { SensitiveContent, secretInputProps } from './SensitiveContent'
 import { useSensitiveSession } from '../lib/useSensitiveSession'
@@ -35,6 +36,7 @@ function SendFromKeyForm({ onClose }: { onClose: () => void }) {
   const { busy } = operation
   const sweepId = useRef<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [retrySubmission, setRetrySubmission] = useState(false)
 
   // Key step.
   const [wif, setWif] = useState('')
@@ -116,7 +118,11 @@ function SendFromKeyForm({ onClose }: { onClose: () => void }) {
       setTxid(res.txid)
       setStep('done')
     } catch (e) {
-      if (operation.current()) setError((e as Error).message)
+      if (operation.current()) {
+        setError((e as Error).message)
+        if (sendRecovery(e) === 'review') { setRetrySubmission(false); setPreview(null); setStep('form') }
+        else setRetrySubmission(true)
+      }
     } finally {
       operation.finish()
     }
@@ -153,11 +159,11 @@ function SendFromKeyForm({ onClose }: { onClose: () => void }) {
       </>
     ) : step === 'review' ? (
       <>
-        <Button variant="secondary" style={{ flex: 1 }} disabled={busy} onClick={() => setStep('form')}>
+        <Button variant="secondary" style={{ flex: 1 }} disabled={busy || retrySubmission} onClick={() => setStep('form')}>
           Back
         </Button>
         <Button style={{ flex: 1 }} disabled={busy} onClick={() => void confirm()}>
-          {busy ? 'Sending…' : 'Send'}
+          {busy ? 'Sending…' : retrySubmission ? 'Check again' : 'Send'}
         </Button>
       </>
     ) : (
@@ -257,7 +263,7 @@ function SendFromKeyForm({ onClose }: { onClose: () => void }) {
                 {sendMax && <div style={{ fontSize: 12, color: 'var(--ink-500)', lineHeight: 1.5 }}>Sweeping the available, mature balance — the exact amount after the fee appears on review.</div>}
               </>
             )}
-            {error !== null && <div className="field-hint field-hint--error">{error}</div>}
+            {error !== null && <div role="alert" className="field-hint field-hint--error">{error}</div>}
           </>
         )}
 
@@ -271,7 +277,7 @@ function SendFromKeyForm({ onClose }: { onClose: () => void }) {
               <ReviewRow label="Signature" value={preview.signature} />
             </div>
             {sendMax && <div style={{ fontSize: 12, color: 'var(--ink-500)', lineHeight: 1.5 }}>All available, mature coins are sent without change. Maturing coins remain at the source address. The key is wiped after sending.</div>}
-            {error !== null && <div className="field-hint field-hint--error">{error}</div>}
+            {error !== null && <div role="alert" className="field-hint field-hint--error">{error}</div>}
           </>
         )}
 
