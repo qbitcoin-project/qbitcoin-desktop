@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ChainTx, Outspend } from '@qbtc/chain'
-import { downgradeScript, federationFreezeScript, federationScripthash, freezeScript, fromHex, getPublicKey, hash256, reclaimScripthash, serialize, toHex, TX_TYPE_STANDARD, type Transaction } from '@qbtc/crypto'
+import { deserialize, downgradeScript, federationFreezeScript, federationScripthash, freezeScript, fromHex, getPublicKey, hash256, reclaimScripthash, serialize, toHex, TX_TYPE_STANDARD, type Transaction } from '@qbtc/crypto'
 import { addressFromScripthash } from '../../src/main/brand/crypto'
 import {
   DowngradeService,
@@ -504,6 +504,10 @@ describe('reclaim', () => {
     // The broadcast reveals the covenant script of the episode's era — the
     // federation freeze script for a current-era episode.
     expect(broadcasts[0]).toContain(toHex(federationFreezeScript(FED_KEYS, FREEZE_SEC)))
+    const raw = fromHex(broadcasts[0]!)
+    const paid = BigInt(EPISODE.valueAtomic) - deserialize(raw).outputs.reduce((s, o) => s + o.value, 0n)
+    expect(paid).toBeGreaterThanOrEqual(BigInt(raw.length))
+    expect(paid - BigInt(raw.length)).toBeLessThanOrEqual(2n) // only DER-length headroom
   })
 
   it('reclaims a LEGACY-era freeze through the single-key script', async () => {
@@ -515,5 +519,7 @@ describe('reclaim', () => {
     await service.reclaim(EPISODE.freezeTxid)
     expect(broadcasts[0]).toContain(toHex(freezeScript(LEGACY_KEY, FREEZE_SEC)))
     expect(broadcasts[0]).not.toContain(toHex(federationFreezeScript(FED_KEYS, FREEZE_SEC)))
+    const raw = fromHex(broadcasts[0]!)
+    expect(BigInt(EPISODE.valueAtomic) - deserialize(raw).outputs[0]!.value).toBeGreaterThanOrEqual(BigInt(raw.length))
   })
 })

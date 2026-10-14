@@ -1,0 +1,7 @@
+{
+  "id": "serialized-transaction-fees",
+  "scope": "shared",
+  "type": "fixed",
+  "bump": "patch",
+  "text": "Calculate network fees from transaction sizes, accounting for Falcon signatures, destination addresses, token data and conversion reclaim scripts."
+}

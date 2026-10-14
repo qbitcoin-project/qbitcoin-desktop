@@ -45,11 +45,12 @@ export class SendService {
     // actual inputs and change shape, so the preview fee equals the built fee
     // and auto and manual agree on the same coin set. Throws InsufficientFunds
     // here (before building) when even a changeless send can't be funded.
-    const feeAtomic = estimateSendFee({ utxos, manualInputs, amountAtomic, feeRatePerVByte: rate, sendMax })
 
     // Pre-derive both change addresses; buildSend picks one by the inputs' majority
     // algorithm so a PQ-funded send keeps its change post-quantum.
     const [classicalChange, pqChange] = await Promise.all([this.deps.getChangeAddress(), this.deps.getPqChangeAddress()])
+    const changeAddressFor = (algo: ChangeBranch): string => (algo === 'falcon512' ? pqChange : classicalChange)
+    const feeAtomic = estimateSendFee({ utxos, manualInputs, amountAtomic, feeRatePerVByte: rate, sendMax, recipient, changeAddressFor })
     const built = buildSend({
       utxos,
       manualInputs,
@@ -57,7 +58,7 @@ export class SendService {
       amountAtomic,
       feeAtomic,
       sendMax,
-      changeAddressFor: (algo) => (algo === 'falcon512' ? pqChange : classicalChange),
+      changeAddressFor,
     })
     this.pending = {
       unsigned: built.unsigned,

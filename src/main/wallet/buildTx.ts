@@ -1,6 +1,7 @@
-import { encodeTokenTransfer, toHex } from '@qbtc/crypto'
+import { encodeTokenTransfer, fromHex, toHex, type TxOutput } from '@qbtc/crypto'
 import { decodeAddress } from '../brand/crypto'
 import type { Algo } from './discovery'
+import { feeForBytes, transactionSizeUpperBound } from './txSize'
 
 // Pure, key-free transaction assembly with a change-avoiding selection (Branch and
 // Bound) and dust folding.
@@ -26,6 +27,8 @@ export type { Algo }
 export type ChangeBranch = 'ecdsa' | 'falcon512'
 
 export interface SpendableUtxo {
+  /** Main-process estimate for an input with a non-standard redeem script. */
+  readonly inputBytes?: number
   readonly txid: string
   readonly vout: number
   readonly value: bigint
@@ -110,13 +113,6 @@ export class InsufficientTokensError extends Error {
 // The node defines no explicit dust limit, so this is our policy — flagged as an
 // open question for the node team.
 export const DUST_ATOMIC = 1000n
-
-// Rough vsize estimates. Classical P2PK input ≈150, Schnorr slightly smaller
-// (64-byte raw sig + 32-byte pubkey vs ~71-byte DER + 33), Falcon ≈1600,
-// output ≈34, overhead ≈10.
-const VBYTES_PER_INPUT: Record<Algo, number> = { ecdsa: 150, schnorr: 140, falcon512: 1600 }
-const VBYTES_PER_OUTPUT = 34
-const VBYTES_OVERHEAD = 10
 
 function descendingByValue(utxos: readonly SpendableUtxo[]): SpendableUtxo[] {
   return [...utxos].sort((a, b) => (a.value < b.value ? 1 : a.value > b.value ? -1 : 0))
@@ -206,13 +202,25 @@ export function selectByToken(utxos: readonly SpendableTokenUtxo[], target: bigi
   return null
 }
 
-/** Fee for a concrete input set at the given rate. `outputCount` defaults to 2
- *  (a payment + change); a token transfer can have up to 3 (recipient, token
- *  change, native change), so it passes 3 to avoid under-paying. */
-export function feeForInputs(inputs: readonly SpendableUtxo[], feeRatePerVByte: number, outputCount = 2): bigint {
-  const inputVbytes = inputs.length > 0 ? inputs.reduce((sum, u) => sum + VBYTES_PER_INPUT[u.algo], 0) : VBYTES_PER_INPUT.ecdsa
-  const vbytes = inputVbytes + outputCount * VBYTES_PER_OUTPUT + VBYTES_OVERHEAD
-  return BigInt(Math.max(1, Math.ceil(vbytes * feeRatePerVByte)))
+/** Concrete output shapes when known; a count means native outputs with the
+ * largest supported hash (e.g. Max, before a recipient has been entered). */
+export function feeForInputs(inputs: readonly SpendableUtxo[], rate: number, outputs: number | readonly TxOutput[] = 2, token = false): bigint {
+  const shaped = typeof outputs === 'number'
+    ? Array.from({ length: outputs }, () => ({ value: 0n, scripthash: new Uint8Array(32) })) : outputs
+  return feeForBytes(transactionSizeUpperBound(inputs, shaped, token), rate)
+}
+
+/** Price the actual draft, retaining each selected input's custom witness size. */
+export function feeForDraft(pool: readonly SpendableUtxo[], unsigned: UnsignedTx, rate: number): bigint {
+  const byOutpoint = new Map(pool.map((u) => [`${u.txid}:${u.vout}`, u]))
+  const inputs = unsigned.inputs.map((i) => {
+    const input = byOutpoint.get(`${i.prevTxid}:${i.vout}`)
+    if (input === undefined) throw new Error('Missing input size for transaction fee.')
+    return input
+  })
+  return feeForInputs(inputs, rate, unsigned.outputs.map((o) => ({ value: BigInt(o.valueAtomic),
+    scripthash: fromHex(o.scripthash), ...(o.data !== undefined ? { data: fromHex(o.data) } : {}),
+  })), unsigned.tokenHash !== undefined)
 }
 
 // The node's canonical input order: txid hex ascending, then vout.
@@ -324,10 +332,8 @@ function majorityAlgo(inputs: readonly SpendableUtxo[]): ChangeBranch {
   return pq * 2 > inputs.length ? 'falcon512' : 'ecdsa'
 }
 
-// Max fixpoint iterations for auto fee/selection. Each step can only add inputs
-// (fee grows monotonically with the input set), so this converges in a few
-// rounds; the cap just bounds a pathological pool.
-const FEE_ITERATIONS = 8
+// Bound pathological selection work; never return an unchecked fee at the cap.
+const FEE_ITERATIONS = 64
 
 /**
  * Estimate the network fee for a send, sized to the ACTUAL inputs the transaction
@@ -346,8 +352,8 @@ const FEE_ITERATIONS = 8
  *    changing (fee ↑ pulls in more inputs, which raises the fee, …). Throws
  *    {@link InsufficientFundsError} when the pool can't cover amount + that fee.
  *
- * All fees round up (ceil, inside {@link feeForInputs}): the wallet never
- * under-pays, at the cost of at most ~1 atomic unit over the node's minimum.
+ * Fees round up and reserve maximum signature sizes; variable signatures and
+ * dust folding can leave a small surplus over the requested rate.
  */
 export function estimateSendFee(params: {
   readonly utxos: readonly SpendableUtxo[]
@@ -355,16 +361,31 @@ export function estimateSendFee(params: {
   readonly amountAtomic: bigint
   readonly feeRatePerVByte: number
   readonly sendMax?: boolean
+  readonly recipient?: string
+  readonly changeAddressFor?: (algo: ChangeBranch) => string
+  /** Extra recipient data, for covenant funding. */
+  readonly recipientData?: Uint8Array
 }): bigint {
   const { utxos, manualInputs, amountAtomic, feeRatePerVByte: rate, sendMax = false } = params
+  const outputsFor = (inputs: readonly SpendableUtxo[], count: number): readonly TxOutput[] => {
+    const changeAddress = params.changeAddressFor?.(majorityAlgo(inputs))
+    return Array.from({ length: count }, (_, i) => {
+      // Max is recipient-independent; keep its preview and build identical.
+      const address = i === 0 ? (sendMax ? undefined : params.recipient) : changeAddress
+      return { value: 0n, scripthash: address === undefined ? new Uint8Array(32) : decodeAddress(address).scripthash,
+        ...(i === 0 && params.recipientData !== undefined ? { data: params.recipientData } : {}),
+      }
+    })
+  }
+  const price = (inputs: readonly SpendableUtxo[], count: number): bigint => feeForInputs(inputs, rate, outputsFor(inputs, count))
 
   if (sendMax) {
     const inputs = manualInputs !== undefined && manualInputs.length > 0 ? manualInputs : utxos
-    return feeForInputs(inputs, rate, 1) // one output, no change
+    return price(inputs, 1) // one output, no change
   }
 
   if (manualInputs !== undefined && manualInputs.length > 0) {
-    return feeForFixedInputs(manualInputs, amountAtomic, rate)
+    return feeForFixedInputs(manualInputs, amountAtomic, price)
   }
 
   // Automatic selection: iterate to a stable (selection, fee) pair. The fee of
@@ -379,11 +400,11 @@ export function estimateSendFee(params: {
     if (selected === null) {
       throw new InsufficientFundsError(amountAtomic + fee, utxos.reduce((sum, u) => sum + u.value, 0n))
     }
-    const nextFee = feeShapeForInputs(selected, amountAtomic, rate)
-    if (nextFee === fee) return fee
+    const nextFee = feeShapeForInputs(selected, amountAtomic, price)
+    if (nextFee <= fee) return fee
     fee = nextFee
   }
-  return fee
+  throw new Error('Could not settle the network fee. Select fewer coins and try again.')
 }
 
 // Fee for a KNOWN input set, choosing the change/changeless shape. A leftover
@@ -391,25 +412,26 @@ export function estimateSendFee(params: {
 // send is changeless (1-output fee) and buildSend folds the tiny remainder into
 // the fee. Throws when the inputs can't even cover a changeless send — for a
 // FIXED set (manual coin control) that is a real shortfall.
-function feeForFixedInputs(inputs: readonly SpendableUtxo[], amountAtomic: bigint, rate: number): bigint {
+type InputPrice = (inputs: readonly SpendableUtxo[], count: number) => bigint
+function feeForFixedInputs(inputs: readonly SpendableUtxo[], amountAtomic: bigint, price: InputPrice): bigint {
   const sum = inputs.reduce((total, u) => total + u.value, 0n)
-  const feeChangeless = feeForInputs(inputs, rate, 1)
+  const feeChangeless = price(inputs, 1)
   if (sum < amountAtomic + feeChangeless) {
     throw new InsufficientFundsError(amountAtomic + feeChangeless, sum)
   }
-  return feeShapeForInputs(inputs, amountAtomic, rate)
+  return feeShapeForInputs(inputs, amountAtomic, price)
 }
 
 // The same change/changeless pricing without the sufficiency verdict: used by
 // the automatic fixpoint, where a selection too small to pay its own fee is a
 // step in the iteration, not an error.
-function feeShapeForInputs(inputs: readonly SpendableUtxo[], amountAtomic: bigint, rate: number): bigint {
+function feeShapeForInputs(inputs: readonly SpendableUtxo[], amountAtomic: bigint, price: InputPrice): bigint {
   const sum = inputs.reduce((total, u) => total + u.value, 0n)
-  const feeWithChange = feeForInputs(inputs, rate, 2)
+  const feeChangeless = price(inputs, 1)
   // A negative "change" means this selection cannot fund the send at all; price
   // it changeless so the caller grows the selection on the next pass.
-  const change = sum - amountAtomic - feeWithChange
-  return change > DUST_ATOMIC ? feeWithChange : feeForInputs(inputs, rate, 1)
+  const change = sum - amountAtomic - feeChangeless
+  return change > DUST_ATOMIC ? price(inputs, 2) : feeChangeless
 }
 
 export interface BuildTokenSendParams {

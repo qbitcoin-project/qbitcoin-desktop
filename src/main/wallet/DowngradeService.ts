@@ -20,6 +20,7 @@ import {
 } from '@qbtc/crypto'
 import { buildSend, estimateSendFee, feeForInputs, type BuiltSend, type SpendableUtxo, type UnsignedTx } from './buildTx'
 import type { SignedTx } from './signTx'
+import { serializedInputBytes, signaturePlaceholder } from './txSize'
 
 // The native→BTC downgrade, user side. Three jobs:
 //
@@ -388,12 +389,6 @@ export class DowngradeService {
     const outpoint = view.reclaimOutpoint
     const value = BigInt(outpoint.valueAtomic)
     const rate = await this.wallet.feeRate()
-    // The reclaim input reveals the covenant script and a pubkey — close to a
-    // classical input; sized as one input plus two outputs' allowance so the
-    // ~60-byte script is comfortably covered at the flat rate.
-    const synthetic: SpendableUtxo = { txid: outpoint.txid, vout: outpoint.vout, value, chain: 0, index: 0, algo: episode.reclaim.algo }
-    const fee = feeForInputs([synthetic], rate, 2)
-    if (value <= fee) throw new Error('The output is too small to pay the reclaim fee.')
     const destAddress = await this.wallet.changeAddressFor(episode.reclaim.algo)
     // The freeze redeem script differs per covenant era; the downgrade
     // output's script is byte-identical in both.
@@ -401,13 +396,21 @@ export class DowngradeService {
       outpoint.kind === 'freeze'
         ? this.eraOf(episode).freezeScript
         : downgradeScript(this.params.outputSeconds)
-    const tx: Transaction = {
-      txType: TX_TYPE_STANDARD,
-      inputs: [{ txid: fromHex(outpoint.txid), vout: outpoint.vout }],
-      outputs: [{ value: value - fee, scripthash: this.wallet.scripthashOf(destAddress) }],
-    }
     const keys = await this.wallet.inputKeypair(episode.reclaim)
     try {
+      // Federation scripts can be several kilobytes. Size the actual reclaim
+      // witness (signature, public key, ELSE selector, covenant), not P2PK.
+      const input = { txid: fromHex(outpoint.txid), vout: outpoint.vout }
+      const inputBytes = serializedInputBytes({ ...input, redeemScript: redeem,
+        siglist: [signaturePlaceholder(episode.reclaim.algo), keys.publicKey, new Uint8Array(0)],
+      })
+      const synthetic: SpendableUtxo = { txid: outpoint.txid, vout: outpoint.vout, value,
+        chain: 0, index: 0, algo: episode.reclaim.algo, inputBytes,
+      }
+      const output = { value: 0n, scripthash: this.wallet.scripthashOf(destAddress) }
+      const fee = feeForInputs([synthetic], rate, [output])
+      if (value <= fee) throw new Error('The output is too small to pay the reclaim fee.')
+      const tx: Transaction = { txType: TX_TYPE_STANDARD, inputs: [input], outputs: [{ ...output, value: value - fee }] }
       const signed = await signReclaimInput(
         tx,
         { inputIndex: 0, privateKey: keys.privateKey, publicKey: keys.publicKey, algo: episode.reclaim.algo },
@@ -535,22 +538,23 @@ export class DowngradeService {
 
   private async buildFreezeDraft(utxos: readonly SpendableUtxo[], amountAtomic: bigint): Promise<BuiltSend> {
     const rate = await this.wallet.feeRate()
-    // The freeze output carries ~57 bytes of data on top of a plain output.
-    // The flat per-output size model doesn't know that, so the estimated fee
-    // gets two extra outputs' worth (68 vbytes) on top — a safe overshoot of
-    // a few atomic units at the flat rate.
-    const dataAllowance = feeForInputs([], rate, 2) - feeForInputs([], rate, 0)
-    const feeAtomic = estimateSendFee({ utxos, amountAtomic, feeRatePerVByte: rate }) + dataAllowance
     const [classicalChange, pqChange] = await Promise.all([
       this.wallet.changeAddressFor('ecdsa'),
       this.wallet.changeAddressFor('falcon512'),
     ])
+    const recipient = this.wallet.covenantAddress(this.federation.freezeScripthash)
+    const changeAddressFor = (algo: 'ecdsa' | 'falcon512'): string => (algo === 'falcon512' ? pqChange : classicalChange)
+    // Public reclaim hash + the longest supported Bitcoin scriptPubKey. Include
+    // this data during selection too: its fee may require another native input.
+    const feeAtomic = estimateSendFee({ utxos, amountAtomic, feeRatePerVByte: rate, recipient,
+      changeAddressFor, recipientData: new Uint8Array(32 + 34),
+    })
     return buildSend({
       utxos,
-      recipient: this.wallet.covenantAddress(this.federation.freezeScripthash),
+      recipient,
       amountAtomic,
       feeAtomic,
-      changeAddressFor: (algo) => (algo === 'falcon512' ? pqChange : classicalChange),
+      changeAddressFor,
     })
   }
 
