@@ -126,7 +126,7 @@ export class SendService {
     const all = await this.deps.gather()
     const frozen = await this.deps.frozen()
     const tokenUtxos: SpendableTokenUtxo[] = all
-      .filter((u) => u.tokenId === tokenId && u.tokenAmount !== undefined)
+      .filter((u) => u.tokenId === tokenId && u.tokenAmount !== undefined && !frozen.has(outpointOf(u)))
       .map((u) => ({ ...u, tokenAmount: u.tokenAmount as bigint }))
     const nativeUtxos = all.filter((u) => u.tokenId === undefined && !frozen.has(outpointOf(u)))
 

@@ -22,7 +22,8 @@ const methods = {
   setCoinLabel: () => {},
   listContacts: () => [],
   listTokens: () => [token],
-  listCoins: () => [coin, { ...coin, outpoint: 'bb:0', valueAtomic: '900000000', frozen: true }],
+  listCoins: () => [coin, { ...coin, outpoint: 'bb:0', valueAtomic: '900000000', frozen: true },
+    { ...coin, outpoint: 'cc:0', valueAtomic: '0', tokenId: token.id, tokenAmountAtomic: token.amountAtomic }],
   getReceiveAddress: (algo = 'ecdsa') => algo === 'falcon512' ? 'falcon-test-address' : address,
   upgradeInfo: () => ({ enabled: true, minConvertValueSat: '10000' }),
   upgradeStatus: () => ({

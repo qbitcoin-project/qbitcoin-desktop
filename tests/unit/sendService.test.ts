@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { SendService, type SendDeps } from '../../src/main/wallet/SendService'
 import type { GatheredUtxo } from '../../src/main/wallet/spendable'
+import type { UnsignedTx } from '../../src/main/wallet/buildTx'
 
 const RECIPIENT = 'bqhHWtW8DUJWfCvik4BgagviXbMyyNBhLnV'
 const CHANGE = 'bqaghDewzjiedo8mH7whakka5nSgRvT7Wr7'
 
 function harness(utxos: GatheredUtxo[], frozen: ReadonlySet<string> = new Set()) {
-  const calls = { sign: 0, broadcast: [] as string[], advance: 0 }
+  const calls = { sign: 0, broadcast: [] as string[], advance: 0, signed: [] as UnsignedTx[] }
   const deps: SendDeps = {
     gather: async () => utxos,
     feeRate: async () => 1,
@@ -16,8 +17,9 @@ function harness(utxos: GatheredUtxo[], frozen: ReadonlySet<string> = new Set())
     advanceChange: async () => {
       calls.advance++
     },
-    sign: async () => {
+    sign: async (unsigned) => {
       calls.sign++
+      calls.signed.push(unsigned)
       return { rawHex: 'aabb', txid: 'tx123' }
     },
     broadcast: async (rawHex: string) => {
@@ -25,7 +27,7 @@ function harness(utxos: GatheredUtxo[], frozen: ReadonlySet<string> = new Set())
       return 'tx123'
     },
   }
-  return { svc: new SendService(deps), calls }
+  return { svc: new SendService(deps), calls, deps }
 }
 
 const utxo = (txid: string, vout: number, value: bigint): GatheredUtxo => ({ txid, vout, value, chain: 0, index: 0, algo: 'ecdsa', address: 'addr', confirmed: true })
@@ -102,6 +104,23 @@ describe('SendService', () => {
   it('refuses a token send when token holdings are short', async () => {
     const { svc } = harness([utxo('e1', 0, 1_000_000n), tutxo('t1', 0, 10n)])
     await expect(svc.buildTokenSend(TOKEN, RECIPIENT, 30n)).rejects.toThrow(/token/i)
+  })
+
+  it('uses only unfrozen token and native outputs, even when frozen ones are larger', async () => {
+    const { svc, calls } = harness([
+      tutxo('frozen-token', 0, 100n), tutxo('free-token', 0, 10n),
+      utxo('frozen-native', 0, 2_000_000n), utxo('free-native', 0, 1_000_000n),
+    ], new Set(['frozen-token:0', 'frozen-native:0']))
+    await svc.buildTokenSend(TOKEN, RECIPIENT, 5n)
+    await svc.confirmSend()
+    expect(calls.signed[0]!.inputs.map((i) => i.prevTxid).sort()).toEqual(['free-native', 'free-token'])
+  })
+
+  it('reports insufficient spendable tokens when only frozen tokens could cover the send', async () => {
+    const { svc, calls } = harness([tutxo('frozen', 0, 100n), tutxo('free', 0, 10n), utxo('native', 0, 1_000_000n)], new Set(['frozen:0']))
+    await expect(svc.buildTokenSend(TOKEN, RECIPIENT, 11n)).rejects.toThrow(/Not enough of this token/)
+    expect(calls.sign).toBe(0)
+    expect(calls.broadcast).toEqual([])
   })
 
   // Regression: the fee estimate must match between automatic selection and an

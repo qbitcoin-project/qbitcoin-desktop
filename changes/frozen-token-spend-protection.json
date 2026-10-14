@@ -1,0 +1,7 @@
+{
+  "id": "frozen-token-spend-protection",
+  "scope": "shared",
+  "type": "fixed",
+  "bump": "patch",
+  "text": "Token transfers now exclude frozen token outputs as well as frozen coins used to pay the network fee."
+}

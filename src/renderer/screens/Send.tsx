@@ -53,11 +53,10 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
 
   const assetSym = asset !== null ? tokenLabels(asset).ticker : nativeLabel
   const decimals = asset !== null ? asset.decimals : 8
-  // "Available": for the native coin, the spendable (unfrozen) balance — matching the Coins
-  // screen's "Spendable"; for a token, its full balance (the fee is a separate native amount).
   const nativeAvailable = coinsData !== undefined ? coinsData.filter((c) => !c.frozen && c.tokenId === undefined).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n).toString() : null
-  const availableLabel = asset !== null ? `${formatToken(asset.amountAtomic, decimals)} ${assetSym}` : nativeAvailable !== null ? `${formatNative(nativeAvailable)} ${nativeLabel}` : null
-  const amountCheck = validateAmount(amount, { decimals, available: asset !== null ? BigInt(asset.amountAtomic) : nativeAvailable !== null ? BigInt(nativeAvailable) : null })
+  const tokenAvailable = asset !== null && coinsData !== undefined ? coinsData.filter((c) => c.tokenId === asset.id && !c.frozen).reduce((sum, c) => sum + BigInt(c.tokenAmountAtomic ?? '0'), 0n) : null
+  const availableLabel = asset !== null ? tokenAvailable !== null ? `${formatToken(tokenAvailable.toString(), decimals)} ${assetSym}` : null : nativeAvailable !== null ? `${formatNative(nativeAvailable)} ${nativeLabel}` : null
+  const amountCheck = validateAmount(amount, { decimals, available: asset !== null ? tokenAvailable : nativeAvailable !== null ? BigInt(nativeAvailable) : null })
   const amountInvalid = amountCheck.atomic === null || amountCheck.error !== null
   const showAmountError = amountLeft && amountCheck.error !== null
 
@@ -412,11 +411,11 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
                 <button
                   type="button"
                   aria-pressed={maxMode}
-                  disabled={maxLoading}
+                  disabled={maxLoading || (asset !== null && tokenAvailable === null)}
                   onClick={() => {
                     if (asset !== null) {
-                      // Token "Max" = the full token balance (the fee is a separate native amount).
-                      setAmount(formatToken(asset.amountAtomic, asset.decimals))
+                      // Only unfrozen tokens can be selected; native coin pays the fee.
+                      setAmount(formatToken((tokenAvailable ?? 0n).toString(), asset.decimals))
                       return
                     }
                     if (maxMode) {
