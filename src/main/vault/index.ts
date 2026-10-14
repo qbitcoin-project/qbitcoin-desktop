@@ -428,7 +428,7 @@ export function createWalletCore(): WalletCore {
   // seed wallet it's derived from the master key; for a watch wallet from its source
   // (xpub or the first listed address), plus a public delegate identifier when present.
   // Best-effort: omit these fields if locked or the source cannot be opened.
-  const addressInfo = async (id: string): Promise<Pick<WalletInfo, 'address' | 'delegatePubkeyhash'>> => {
+  const addressInfo = async (id: string): Promise<Pick<WalletInfo, 'address' | 'delegatePubkeyhash' | 'ownerAlgo'>> => {
     try {
       const entry = registry.get(id)
       if (entry === undefined) return {}
@@ -446,7 +446,7 @@ export function createWalletCore(): WalletCore {
         // A key wallet's single address is persisted beside the sealed key.
         const stored = await new KeyStore(new FileVaultStorage(join(walletDir(userData, id), 'key.json')), vault).load()
         if (stored === null) return {}
-        return { address: stored.address, ...(stored.delegatePubkeyhash !== undefined ? { delegatePubkeyhash: stored.delegatePubkeyhash } : {}) }
+        return { address: stored.address, ownerAlgo: stored.algo, ...(stored.delegatePubkeyhash !== undefined ? { delegatePubkeyhash: stored.delegatePubkeyhash } : {}) }
       }
       const stored = await new WatchSourceStore(new FileVaultStorage(join(walletDir(userData, id), 'watch.json')), vault).load()
       if (stored === null) return {}

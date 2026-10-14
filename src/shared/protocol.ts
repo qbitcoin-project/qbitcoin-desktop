@@ -439,6 +439,8 @@ export interface WalletInfo {
   /** A representative address (first classical receive) for display; absent if locked. */
   readonly address?: string
   readonly delegatePubkeyhash?: string
+  /** Actual owner signing algorithm for imported keys; not inferred from an address. */
+  readonly ownerAlgo?: AddressAlgo
 }
 
 // The chain backends the wallet can point at. 'public' is the bundled node, 'own' a

@@ -1,0 +1,7 @@
+{
+  "id": "owner-algorithm-badges",
+  "scope": "shared",
+  "type": "fixed",
+  "bump": "patch",
+  "text": "Imported wallets show the owner's signature algorithm separately from delegated staking, so a long address no longer incorrectly implies Falcon protection."
+}

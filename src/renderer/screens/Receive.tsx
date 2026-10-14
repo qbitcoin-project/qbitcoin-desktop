@@ -3,17 +3,19 @@ import { useEffect, useState } from 'react'
 import type { AddressAlgo, ReceiveAddressEntry } from '../../shared/protocol'
 import { wallet } from '../lib/wallet'
 import { useWallets } from '../lib/walletData'
+import { KeyOwnerBadge } from '../components/KeyOwnerBadge'
 import { AtomIcon, Button, CheckIcon, CopyIcon, Modal, Pill, PlusIcon, Screen, Segmented } from '../ui'
 
 // Receive screen. The address is derived in main (window.wallet.getReceiveAddress);
 // the renderer only displays it and its QR. "New address" advances the HD index so
 // each share can use a fresh address (privacy). A key wallet has exactly ONE
 // address of one algorithm — main returns it whatever algo is asked — so the
-// type toggle and the address controls are hidden, and the post-quantum badge
-// is inferred from the address shape (PQ scripthashes are 32 bytes → 52 chars).
+// type toggle and the address controls are hidden. Its badge uses the stored
+// owner algorithm: a long delegation address can still have an ECDSA owner.
 export function Receive({ initialAlgo = 'ecdsa' }: { initialAlgo?: AddressAlgo }) {
   const wallets = useWallets()
-  const singleKey = wallets.find((w) => w.active)?.kind === 'key'
+  const activeWallet = wallets.find((w) => w.active)
+  const singleKey = activeWallet?.kind === 'key'
   const [address, setAddress] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -22,7 +24,7 @@ export function Receive({ initialAlgo = 'ecdsa' }: { initialAlgo?: AddressAlgo }
   const [all, setAll] = useState<readonly ReceiveAddressEntry[]>([])
   const [copiedAddr, setCopiedAddr] = useState<string | null>(null)
   const [algo, setAlgo] = useState<AddressAlgo>(initialAlgo)
-  const pq = singleKey ? address !== null && address.length > 40 : algo === 'falcon512'
+  const pq = singleKey ? activeWallet.ownerAlgo === 'falcon512' : algo === 'falcon512'
 
   useEffect(() => {
     let active = true
@@ -106,11 +108,11 @@ export function Receive({ initialAlgo = 'ecdsa' }: { initialAlgo?: AddressAlgo }
         )}
         <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 18, padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
           {/* Reserve the badge's height in both modes so the QR never jumps. */}
-          <div style={{ alignSelf: 'flex-start', visibility: pq ? 'visible' : 'hidden' }}>
+          {singleKey ? <div style={{ alignSelf: 'flex-start' }}><KeyOwnerBadge wallet={activeWallet} /></div> : <div style={{ alignSelf: 'flex-start', visibility: pq ? 'visible' : 'hidden' }}>
             <Pill tone="pq" icon={<AtomIcon size={13} />}>
               Post-quantum address
             </Pill>
-          </div>
+          </div>}
           {/* QR tile — always on white (scanners want the quiet zone light), so
               on a light theme it needs a border on ALL sides to read as a tile;
               a bottom-only shadow looked like a stray line. */}

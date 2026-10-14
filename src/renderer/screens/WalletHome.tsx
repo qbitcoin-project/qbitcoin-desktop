@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { HistoryItem, TokenBalance } from '../../shared/protocol'
 import { TxDetailDrawer } from '../components/TxDetailDrawer'
 import { TxLabelLine } from '../components/TxLabelLine'
+import { KeyOwnerBadge } from '../components/KeyOwnerBadge'
 import { formatNative, formatToken, historyAmount, shortHash } from '../lib/format'
 import { useActiveWallet, useAssetLabel, useHistory, useSummary, useTokens } from '../lib/walletData'
 import { AtomIcon, Button, ChevRightIcon, ReceiveIcon, Screen, SendIcon, TokenGlyph } from '../ui'
@@ -18,8 +19,9 @@ export function WalletHome({ onSend, onReceive, onReceiveFalcon, onSeeAll, onSen
   const asset = useAssetLabel()
   const activeWallet = useActiveWallet()
   // Single-key wallets cannot derive another algorithm. Only show the shortcut
-  // for seed wallets and imported Falcon keys (32-byte scripthashes).
-  const hasFalcon = activeWallet?.kind === 'seed' || (activeWallet?.kind === 'key' && (activeWallet.address?.length ?? 0) > 40)
+  // for seed wallets and imported Falcon owners, regardless of address length.
+  const hasFalcon = activeWallet?.kind === 'seed' || (activeWallet?.kind === 'key' && activeWallet.ownerAlgo === 'falcon512')
+  const delegated = activeWallet?.delegatePubkeyhash !== undefined
 
   return (
     <Screen>
@@ -29,6 +31,7 @@ export function WalletHome({ onSend, onReceive, onReceiveFalcon, onSeeAll, onSen
           <div style={{ flex: '1 1 0', minWidth: 380, width: '100%' }}>
             <div style={{ background: 'radial-gradient(135% 150% at 0% 0%, color-mix(in srgb, var(--primary) 20%, var(--card)) 0%, var(--card) 52%)', border: '1px solid var(--border)', borderRadius: 18, padding: '26px 28px 24px' }}>
               <div style={{ fontSize: 13, color: 'var(--ink-500)', fontWeight: 500 }}>Total balance</div>
+              <KeyOwnerBadge wallet={activeWallet} />
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
                 {summary !== undefined ? (
                   <>
@@ -92,11 +95,11 @@ export function WalletHome({ onSend, onReceive, onReceiveFalcon, onSeeAll, onSen
                 <span style={{ width: 36, height: 36, flex: 'none', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--pq-soft)', color: 'var(--pq)' }}>
                   <AtomIcon size={20} />
                 </span>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-900)' }}>Post-quantum secure</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-900)' }}>{delegated ? 'Falcon-512 owner' : 'Post-quantum secure'}</div>
               </div>
-              <p style={{ fontSize: 13, color: 'var(--ink-500)', lineHeight: 1.55, margin: '13px 0 0' }}>Your keys are protected by Falcon-512 signatures — safe against future quantum attacks.</p>
+              <p style={{ fontSize: 13, color: 'var(--ink-500)', lineHeight: 1.55, margin: '13px 0 0' }}>{delegated ? 'Your owner key uses Falcon-512 signatures. The delegate has separate permission to stake this address.' : 'Your keys are protected by Falcon-512 signatures — safe against future quantum attacks.'}</p>
               <button type="button" onClick={onReceiveFalcon} style={{ marginTop: 14, border: 'none', background: 'transparent', color: 'var(--pq)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
-                View your Falcon address →
+                {delegated ? 'View your delegated address →' : 'View your Falcon address →'}
               </button>
             </div>}
           </div>
