@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import type { AddressAlgo, SendPreview } from '../../shared/protocol'
+import type { AddressAlgo, SendPreview, SweepScan } from '../../shared/protocol'
+import { DelegationNotice } from './DelegationNotice'
 import { SensitiveContent, secretInputProps } from './SensitiveContent'
 import { useSensitiveSession } from '../lib/useSensitiveSession'
 import { useKeyInspection } from '../lib/useKeyInspection'
@@ -39,7 +40,7 @@ function SendFromKeyForm({ onClose }: { onClose: () => void }) {
   const [wif, setWif] = useState('')
 
   // Scan result + form / review / done.
-  const [scanned, setScanned] = useState<{ address: string; balanceAtomic: string } | null>(null)
+  const [scanned, setScanned] = useState<SweepScan | null>(null)
   const [recipient, setRecipient] = useState('')
   const [amount, setAmount] = useState('')
   const [sendMax, setSendMax] = useState(false)
@@ -202,12 +203,13 @@ function SendFromKeyForm({ onClose }: { onClose: () => void }) {
                     <span style={{ fontSize: 11.5, color: 'var(--ink-500)' }}>Address of this key — confirm it is the one you expect</span>
                     {keyAlgo === 'falcon512' && (
                       <Pill tone="pq" icon={<AtomIcon size={12} />}>
-                        Post-quantum
+                        {inspection.delegatePubkeyhash ? 'Falcon-512 owner' : 'Post-quantum'}
                       </Pill>
                     )}
                   </div>
                   <code style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--ink-700)', lineHeight: 1.5, wordBreak: 'break-all' }}>{inspection.addresses[keyAlgo] ?? '—'}</code>
                 </div>
+                {inspection.delegatePubkeyhash && <DelegationNotice delegatePubkeyhash={inspection.delegatePubkeyhash} />}
               </>
             )}
           </>
@@ -215,6 +217,7 @@ function SendFromKeyForm({ onClose }: { onClose: () => void }) {
 
         {step === 'form' && scanned !== null && (
           <>
+            {scanned.delegatePubkeyhash && <DelegationNotice delegatePubkeyhash={scanned.delegatePubkeyhash} />}
             <div style={{ background: 'var(--well)', border: '1px solid var(--border)', borderRadius: 12, padding: '11px 13px', display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                 <span style={{ fontSize: 11.5, color: 'var(--ink-500)' }}>Balance on this key</span>

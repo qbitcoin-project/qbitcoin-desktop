@@ -1,9 +1,10 @@
 import type { AddressInfo, Utxo } from '@qbtc/chain'
-import { fromHex, getPublicKey, scriptP2PK, toHex } from '@qbtc/crypto'
-import { addressFromPubkey, encodeWif } from '../../src/main/brand/crypto'
+import { deserialize, fromHex, getPublicKey, scriptP2PK, SIGHASH, sighash, toHex, verifySiglistEntry } from '@qbtc/crypto'
+import { addressFromPubkey, decodeAddress, encodeWif, sighashCommitsTokenId } from '../../src/main/brand/crypto'
 import { describe, expect, it } from 'vitest'
 import { importedKeyFromStored, type ImportedKey } from '../../src/main/wallet/keyWallet'
 import { createSweepSession, type SweepBackend } from '../../src/main/wallet/sweep'
+import { delegatedKeyFixture } from '../fixtures/delegatedKey'
 
 // A real ECDSA key so the session derives, signs and serializes for real —
 // only the chain is faked.
@@ -90,4 +91,59 @@ describe('createSweepSession', () => {
     expect(key.privateKey.every((b) => b === 0)).toBe(true)
     await expect(session.send.confirmSend()).rejects.toThrow(/No transaction to confirm/)
   })
+})
+
+describe('delegated-key sends and sweeps', () => {
+  for (const algo of ['ecdsa', 'falcon512'] as const) {
+    for (const length of [20, 32] as const) {
+      for (const mode of ['auto', 'manual', 'max', 'token'] as const) {
+        it(`${algo}/${length}: ${mode} pays for its serialized size and preserves the delegation on change`, async () => {
+          const { wif } = await delegatedKeyFixture(algo, length)
+          const key = await importedKeyFromStored({ wif, algo, address: '' }, 'mainnet')
+          const coins: Utxo[] = [utxo(1, 200_000n), utxo(2, 300_000n)]
+          const tokenId = 'ef'.repeat(32)
+          if (mode === 'token') coins.push({ ...utxo(3, 0n), tokenId, tokenAmount: 500n })
+          let raw = ''
+          const session = createSweepSession(backend(key, coins, (hex) => { raw = hex }), key, 'mainnet')
+          try {
+            expect(session.delegatePubkeyhash).toBeDefined()
+            expect((await session.scanBalance()).balanceAtomic).toBe('500000')
+            const manual = mode === 'manual' ? coins.slice(0, 1).map((u) => `${u.txid}:${u.vout}`) : undefined
+            const max = mode === 'max' ? await session.send.maxSendable() : undefined
+            const preview = mode === 'token'
+              ? await session.send.buildTokenSend(tokenId, RECIPIENT, 100n)
+              : await session.send.buildSend(RECIPIENT, 40_000n, manual, mode === 'max')
+            if (max !== undefined) {
+              expect(preview.feeAtomic).toBe(max.feeAtomic)
+              expect('amountAtomic' in preview && preview.amountAtomic).toBe(max.amountAtomic)
+            }
+            await session.send.confirmSend()
+            const tx = deserialize(fromHex(raw))
+            const fee = BigInt(preview.feeAtomic)
+            // The session's fee estimate selects the backend's six-block rate.
+            expect(fee).toBeGreaterThanOrEqual(BigInt(raw.length / 2 * 5))
+            const ownHash = decodeAddress(key.address).scripthash
+            if (mode === 'max') expect(tx.outputs).toHaveLength(1)
+            else expect(tx.outputs.slice(1).every((o) => toHex(o.scripthash) === toHex(ownHash))).toBe(true)
+            if (mode === 'manual') {
+              expect(tx.inputs).toHaveLength(1)
+              expect(toHex(tx.inputs[0]!.txid)).toBe(coins[0]!.txid)
+            }
+            if (mode === 'token') {
+              expect(tx.txType).toBe(4)
+              expect(toHex(tx.tokenHash!)).toBe(tokenId)
+              expect(tx.outputs.filter((o) => o.data?.[0] === 1)).toHaveLength(2)
+            }
+            const digest = sighash(tx, SIGHASH.ALL, sighashCommitsTokenId('mainnet'))
+            for (const input of tx.inputs) {
+              expect(input.redeemScript).toEqual(key.delegation!.redeemScript)
+              expect(input.siglist![2]).toEqual(Uint8Array.of(1))
+              expect(await verifySiglistEntry(input.siglist![0]!, digest, key.publicKey)).toBe(true)
+            }
+          } finally { session.dispose() }
+          expect(key.privateKey.every((b) => b === 0)).toBe(true)
+        })
+      }
+    }
+  }
 })

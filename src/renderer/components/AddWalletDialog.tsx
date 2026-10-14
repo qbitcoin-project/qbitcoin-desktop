@@ -3,6 +3,7 @@ import type { AddressAlgo, WatchInput } from '../../shared/protocol'
 import { SensitiveContent, secretInputProps } from './SensitiveContent'
 import { useSensitiveSession } from '../lib/useSensitiveSession'
 import { useKeyInspection } from '../lib/useKeyInspection'
+import { DelegationNotice } from './DelegationNotice'
 import { useOperation } from '../lib/useOperation'
 import { brand } from '../brand'
 import { resetWalletData, setWallets, useWallets } from '../lib/walletData'
@@ -167,12 +168,13 @@ function AddWalletForm({ onClose }: { onClose: () => void }) {
                     <span style={{ fontSize: 11.5, color: 'var(--ink-500)' }}>Address to watch — confirm it is the one you expect</span>
                     {keyAlgo === 'falcon512' && (
                       <Pill tone="pq" icon={<AtomIcon size={12} />}>
-                        Post-quantum
+                        {inspection.delegatePubkeyhash ? 'Falcon-512 owner' : 'Post-quantum'}
                       </Pill>
                     )}
                   </div>
                   <code style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--ink-700)', lineHeight: 1.5, wordBreak: 'break-all' }}>{inspection.addresses[keyAlgo] ?? '—'}</code>
                 </div>
+                {inspection.delegatePubkeyhash && <DelegationNotice delegatePubkeyhash={inspection.delegatePubkeyhash} />}
               </>
             )}
             {access.active && <Alert variant="caution">

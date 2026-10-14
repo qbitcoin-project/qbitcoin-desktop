@@ -1,0 +1,7 @@
+{
+  "id": "delegated-owner-key-import",
+  "scope": "shared",
+  "type": "added",
+  "bump": "minor",
+  "text": "Import delegated-staking private keys, receive and send from their delegated address, and back up the complete key. Key previews identify the delegate and explain staking maturity."
+}

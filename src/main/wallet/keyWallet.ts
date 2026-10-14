@@ -1,19 +1,22 @@
 import {
   falconKeypairFromWifPayload,
+  encodeSiglistEntry,
   getPublicKey,
   schnorrGetPublicKey,
   serialize,
   SIGHASH,
+  sighash,
+  signWithAlgorithm,
   signTransaction,
   toHex,
   txid as computeTxid,
   type Algorithm,
   type Network,
   type SigningInput,
+  type Transaction,
 } from '@qbtc/crypto'
 import {
   addressFromPubkey,
-  decodeWif,
   sighashCommitsTokenId,
 } from '../brand/crypto'
 import type { AddressOps } from '../vault/orchestrator'
@@ -21,6 +24,9 @@ import type { AddressSource } from './AddressSource'
 import type { UnsignedTx } from './buildTx'
 import type { StoredKey } from './keyStore'
 import { toCryptoTransaction, type SignedTx } from './signTx'
+import { decodeWalletWif } from './keyWif'
+import { delegationAddress, delegationScript, encodeDelegatePubkeyhash, ownerPubkeyhash } from './delegation'
+import { serializedInputBytes, signaturePlaceholder } from './txSize'
 
 // A single imported private key (kind: 'key' wallet) — the building blocks.
 //
@@ -37,6 +43,10 @@ export interface ImportedKey {
   readonly privateKey: Uint8Array
   readonly publicKey: Uint8Array
   readonly address: string
+  readonly delegation?: {
+    readonly delegatePubkeyhash: Uint8Array
+    readonly redeemScript: Uint8Array
+  }
 }
 
 /**
@@ -48,12 +58,13 @@ export interface ImportedKey {
  * Async: a Falcon key runs its pair self-check in WASM.
  */
 export async function importedKeyFromStored(stored: StoredKey, network: Network): Promise<ImportedKey> {
-  const { payload, candidates } = decodeWif(stored.wif, network)
+  const { payload, candidates, delegatePubkeyhash } = decodeWalletWif(stored.wif, network)
   if (!candidates.includes(stored.algo)) {
     payload.fill(0)
     throw new Error(`This key cannot be used as ${stored.algo}.`)
   }
 
+  let materialized: ImportedKey | undefined
   try {
     let key: ImportedKey
     if (stored.algo === 'falcon512') {
@@ -66,6 +77,13 @@ export async function importedKeyFromStored(stored: StoredKey, network: Network)
       const publicKey = stored.algo === 'schnorr' ? schnorrGetPublicKey(payload) : getPublicKey(payload)
       key = { algo: stored.algo, privateKey: payload, publicKey, address: addressFromPubkey(publicKey, stored.algo, network) }
     }
+    materialized = key
+    if (delegatePubkeyhash !== undefined) {
+      const owner = ownerPubkeyhash(key.publicKey, key.algo)
+      key = { ...key, address: delegationAddress(owner, delegatePubkeyhash, network), delegation: {
+        delegatePubkeyhash, redeemScript: delegationScript(owner, delegatePubkeyhash),
+      } }
+    }
 
     if (stored.address !== '' && key.address !== stored.address) {
       key.privateKey.fill(0)
@@ -73,6 +91,7 @@ export async function importedKeyFromStored(stored: StoredKey, network: Network)
     }
     return key
   } catch (error) {
+    materialized?.privateKey.fill(0)
     payload.fill(0)
     throw error
   }
@@ -106,6 +125,7 @@ export function keyReceiveOps(getKey: () => Promise<ImportedKey>): AddressOps {
 export interface KeyCandidates {
   readonly candidates: readonly Algorithm[]
   readonly addresses: Partial<Record<Algorithm, string>>
+  readonly delegatePubkeyhash?: string
 }
 
 /**
@@ -115,23 +135,27 @@ export interface KeyCandidates {
  * listed only when explicitly included (the feature flag decides upstream).
  */
 export async function inspectWifKey(wif: string, network: Network, opts?: { readonly includeSchnorr?: boolean }): Promise<KeyCandidates> {
-  const { payload, candidates } = decodeWif(wif, network)
+  const { payload, candidates, delegatePubkeyhash } = decodeWalletWif(wif, network)
   const offered = candidates.filter((a) => a !== 'schnorr' || opts?.includeSchnorr === true)
   const addresses: Partial<Record<Algorithm, string>> = {}
   try {
     for (const algo of offered) {
+      let publicKey: Uint8Array
       if (algo === 'falcon512') {
         const kp = await falconKeypairFromWifPayload(payload)
         kp.privateKey.fill(0)
-        addresses[algo] = addressFromPubkey(kp.publicKey, algo, network)
+        publicKey = kp.publicKey
       } else {
-        addresses[algo] = addressFromPubkey(algo === 'schnorr' ? schnorrGetPublicKey(payload) : getPublicKey(payload), algo, network)
+        publicKey = algo === 'schnorr' ? schnorrGetPublicKey(payload) : getPublicKey(payload)
       }
+      addresses[algo] = delegatePubkeyhash === undefined
+        ? addressFromPubkey(publicKey, algo, network)
+        : delegationAddress(ownerPubkeyhash(publicKey, algo), delegatePubkeyhash, network)
     }
   } finally {
     payload.fill(0)
   }
-  return { candidates: offered, addresses }
+  return { candidates: offered, addresses, ...(delegatePubkeyhash !== undefined ? { delegatePubkeyhash: encodeDelegatePubkeyhash(delegatePubkeyhash, network) } : {}) }
 }
 
 /**
@@ -145,12 +169,30 @@ export async function inspectWifKey(wif: string, network: Network, opts?: { read
  */
 export async function signUnsignedTxWithKey(unsigned: UnsignedTx, key: ImportedKey, network: Network): Promise<SignedTx> {
   const tx = toCryptoTransaction(unsigned)
-  const signers: SigningInput[] = unsigned.inputs.map((input, index) => {
+  unsigned.inputs.forEach((input, index) => {
     if (input.algo !== key.algo) {
       throw new Error(`Input ${index} expects a ${input.algo} key, but the imported key is ${key.algo}.`)
     }
-    return { inputIndex: index, privateKey: key.privateKey, publicKey: key.publicKey, algo: key.algo }
   })
-  const signed = await signTransaction(tx, signers, SIGHASH.ALL, sighashCommitsTokenId(network))
+  let signed: Transaction
+  const delegation = key.delegation
+  if (delegation === undefined) {
+    const signers: SigningInput[] = unsigned.inputs.map((_, inputIndex) => ({ inputIndex, privateKey: key.privateKey, publicKey: key.publicKey, algo: key.algo }))
+    signed = await signTransaction(tx, signers, SIGHASH.ALL, sighashCommitsTokenId(network))
+  }
+  else {
+    const digest = sighash(tx, SIGHASH.ALL, sighashCommitsTokenId(network))
+    const signature = encodeSiglistEntry(SIGHASH.ALL, key.algo, await signWithAlgorithm(digest, key.privateKey, key.algo))
+    signed = { ...tx, inputs: tx.inputs.map((input) => ({ ...input, redeemScript: delegation.redeemScript, siglist: [signature, key.publicKey, Uint8Array.of(1)] })) }
+  }
   return { rawHex: toHex(serialize(signed)), txid: toHex(computeTxid(signed)) }
+}
+
+/** Upper bound for the serialized delegated input, including the owner public
+ * key and branch selector. Ordinary inputs are sized by the shared estimator. */
+export function keyInputBytes(key: ImportedKey): number | undefined {
+  if (key.delegation === undefined) return undefined
+  return serializedInputBytes({ txid: new Uint8Array(32), vout: 0xffffffff, redeemScript: key.delegation.redeemScript,
+    siglist: [signaturePlaceholder(key.algo), key.publicKey, Uint8Array.of(1)],
+  })
 }

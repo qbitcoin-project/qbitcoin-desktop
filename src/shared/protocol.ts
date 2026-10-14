@@ -416,6 +416,8 @@ export interface KeyInspection {
   readonly candidates: readonly AddressAlgo[]
   /** Candidate algorithm → the single address the key would have. */
   readonly addresses: Partial<Record<AddressAlgo, string>>
+  /** Public delegate identifier for a delegated-staking owner WIF. */
+  readonly delegatePubkeyhash?: string
 }
 
 // Result of starting an ephemeral sweep: the address being swept and its current
@@ -423,6 +425,7 @@ export interface KeyInspection {
 export interface SweepScan {
   readonly address: string
   readonly balanceAtomic: string
+  readonly delegatePubkeyhash?: string
 }
 
 export interface WalletInfo {
@@ -435,6 +438,7 @@ export interface WalletInfo {
   readonly removable: boolean
   /** A representative address (first classical receive) for display; absent if locked. */
   readonly address?: string
+  readonly delegatePubkeyhash?: string
 }
 
 // The chain backends the wallet can point at. 'public' is the bundled node, 'own' a

@@ -1,21 +1,24 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { deserialize, falcon512KeygenFromSeed, fromHex, setSchnorrEnabled } from '@qbtc/crypto'
+import { deserialize, fromHex, setSchnorrEnabled } from '@qbtc/crypto'
 import { addressFromScripthash, encodeWif } from '../../src/main/brand/crypto'
 import { SendService } from '../../src/main/wallet/SendService'
 import { buildSend, estimateSendFee, feeForDraft, InsufficientFundsError } from '../../src/main/wallet/buildTx'
-import { importedKeyFromStored, signUnsignedTxWithKey, type ImportedKey } from '../../src/main/wallet/keyWallet'
+import { decodeWalletWif } from '../../src/main/wallet/keyWif'
+import { importedKeyFromStored, keyInputBytes, signUnsignedTxWithKey, type ImportedKey } from '../../src/main/wallet/keyWallet'
 import type { GatheredUtxo } from '../../src/main/wallet/spendable'
+import { delegatedKeyFixture } from '../fixtures/delegatedKey'
 
 const TOKEN = 'ab'.repeat(32)
 const keys = new Map<string, ImportedKey>()
 beforeAll(async () => {
   setSchnorrEnabled(true)
   for (const algo of ['ecdsa', 'schnorr', 'falcon512'] as const) {
-    const pair = algo === 'falcon512' ? await falcon512KeygenFromSeed(new Uint8Array(48).fill(7)) : undefined
-    const payload = pair === undefined ? new Uint8Array(32).fill(1) : new Uint8Array([...pair.privateKey, ...pair.publicKey])
-    const wif = encodeWif(payload, 'mainnet')
-    payload.fill(0); pair?.privateKey.fill(0)
-    keys.set(`${algo}-ordinary`, await importedKeyFromStored({ wif, algo, address: '' }, 'mainnet'))
+    const { wif } = await delegatedKeyFixture(algo)
+    keys.set(`${algo}-delegated`, await importedKeyFromStored({ wif, algo, address: '' }, 'mainnet'))
+    const decoded = decodeWalletWif(wif, 'mainnet')
+    const ordinary = encodeWif(decoded.payload, 'mainnet')
+    decoded.payload.fill(0)
+    keys.set(`${algo}-ordinary`, await importedKeyFromStored({ wif: ordinary, algo, address: '' }, 'mainnet'))
   }
 })
 afterAll(() => { for (const key of keys.values()) key.privateKey.fill(0); setSchnorrEnabled(false) })
@@ -23,6 +26,7 @@ afterAll(() => { for (const key of keys.values()) key.privateKey.fill(0); setSch
 const coin = (key: ImportedKey, n: number, value: bigint): GatheredUtxo => ({
   txid: n.toString(16).padStart(64, '0'), vout: n % 2 === 0 ? 65536 : 253,
   value, algo: key.algo, chain: 0, index: 0, address: key.address, confirmed: true,
+  ...(keyInputBytes(key) !== undefined ? { inputBytes: keyInputBytes(key) } : {}),
 })
 function service(key: ImportedKey, coins: GatheredUtxo[], rate: number) {
   const sent: string[] = []
@@ -44,7 +48,7 @@ function assertPaid(raw: string, fee: string, rate: number, coins: GatheredUtxo[
 
 describe('fees cover real signed transactions', () => {
   for (const algo of ['ecdsa', 'schnorr', 'falcon512'] as const) {
-    for (const kind of ['ordinary'] as const) {
+    for (const kind of ['ordinary', 'delegated'] as const) {
       it(`${algo} ${kind}: automatic, manual, Max and tokens pay the requested rate for both output hash lengths`, async () => {
         const key = keys.get(`${algo}-${kind}`)!
         const rate = 5.25
@@ -70,8 +74,8 @@ describe('fees cover real signed transactions', () => {
     }
   }
 
-  it.each([['ecdsa', 1200n], ['falcon512', 12000n]] as const)('reselects fragmented %s fee inputs until the entire token transaction is funded', async (algo, value) => {
-    const key = keys.get(`${algo}-ordinary`)!
+  it.each([['ecdsa', 1500n], ['falcon512', 12000n]] as const)('reselects fragmented %s fee inputs until the entire token transaction is funded', async (algo, value) => {
+    const key = keys.get(`${algo}-delegated`)!
     const coins = [
       ...Array.from({ length: 30 }, (_, i) => coin(key, i + 1, value)),
       { ...coin(key, 31, 0n), tokenId: TOKEN, tokenAmount: 500n },
@@ -84,7 +88,7 @@ describe('fees cover real signed transactions', () => {
   })
 
   it('rejects a token draft whose inputs cover the initial estimate but cannot pay their own final size', async () => {
-    const key = keys.get('falcon512-ordinary')!
+    const key = keys.get('falcon512-delegated')!
     const coins = [coin(key, 1, 12000n), { ...coin(key, 2, 0n), tokenId: TOKEN, tokenAmount: 500n }]
     const { svc, sent } = service(key, coins, 5)
     await expect(svc.buildTokenSend(TOKEN, key.address, 100n)).rejects.toThrow(InsufficientFundsError)

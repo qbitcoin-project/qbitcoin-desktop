@@ -1,4 +1,5 @@
 import type { SweepSession } from './sweep'
+import type { SweepScan } from '../../shared/protocol'
 
 // Ownership starts before key derivation, so cancel/lock also reaches a key
 // created after cancellation. An old dialog cannot dispose a newer scan.
@@ -18,7 +19,7 @@ export class SweepSlot {
   }
   cancelPending(owner: string): void { if (this.pending) this.dispose(owner) }
   disposeSession(session: SweepSession): void { if (this.session === session) this.dispose() }
-  async scan(owner: string, create: () => Promise<SweepSession>): Promise<{ address: string; balanceAtomic: string }> {
+  async scan(owner: string, create: () => Promise<SweepSession>): Promise<SweepScan> {
     this.dispose()
     this.owner = owner
     this.pending = true
@@ -30,7 +31,7 @@ export class SweepSlot {
       this.session = session
       const balance = await session.scanBalance()
       if (generation !== this.generation) throw new Error('Key scan cancelled. Start again.')
-      return { address: session.address, ...balance }
+      return { address: session.address, ...balance, ...(session.delegatePubkeyhash !== undefined ? { delegatePubkeyhash: session.delegatePubkeyhash } : {}) }
     } catch (error) {
       session?.dispose()
       if (this.session === session) { this.session = null; this.owner = null }

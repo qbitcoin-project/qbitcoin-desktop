@@ -10,6 +10,7 @@ import { parseWatchInput } from '../../src/main/wallet/watchSource'
 import { descriptorSchemes, parseWatchDescriptor } from '../../src/main/wallet/watchDescriptor'
 import { SensitiveSessionError } from '../../src/shared/privacy'
 import type { WalletBackup } from '../../src/shared/protocol'
+import { delegatedKeyFixture } from '../fixtures/delegatedKey'
 
 const PRIMARY = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
 const IMPORTED = 'legal winner thank year wave sausage worth useful legal winner thank yellow'
@@ -71,6 +72,30 @@ async function setup() {
 }
 
 describe('wallet-specific backup with the published vault and sealed stores', () => {
+  it.each(['ecdsa', 'falcon512'] as const)('restores the complete delegated %s WIF after lock, password change and restart', async (algo) => {
+    const { vault, persistence, files } = await setup()
+    const { wif: delegatedWif } = await delegatedKeyFixture(algo)
+    const key = await importedKeyFromStored({ wif: delegatedWif, algo, address: '' }, 'mainnet')
+    const stored = { wif: delegatedWif, algo, address: key.address }
+    files.set('key/key.json', await vault.sealData(JSON.stringify(stored)))
+    expect(files.get('key/key.json')).not.toContain(delegatedWif)
+    key.privateKey.fill(0)
+    await vault.changePassword(PASSWORD, 'new-password')
+    vault.lock()
+    const restarted = new RestorableVault(persistence, config)
+    live.push(restarted)
+    await restarted.unlock('new-password')
+    const registry = { getActiveId: () => 'key', get: () => ({ id: 'key', kind: 'key' as const, label: 'Delegated', createdAt: 1 }) }
+    const backup = new WalletBackupService(restarted, registry, 'mainnet', (id, file) => ({ read: async () => files.get(`${id}/${file}`) ?? null, write: async () => { throw new Error('No writes') } }))
+    const result = await backup.reveal('key', 'new-password', () => {})
+    expect(result).toEqual({ walletId: 'key', kind: 'key', ...stored, network: 'mainnet' })
+    if (result.kind !== 'key') throw new Error('Expected a key backup')
+    const restored = await importedKeyFromStored(result, 'mainnet')
+    expect(restored.address).toBe(stored.address)
+    expect(restored.delegation).toEqual(key.delegation)
+    restored.privateKey.fill(0)
+  })
+
   it('returns each wallet’s own seed and exact passphrase even when names match', async () => {
     const { reveal, select, write } = await setup()
     const second = await reveal()

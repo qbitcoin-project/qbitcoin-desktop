@@ -7,16 +7,18 @@ import { btcEsploraDefaultsFor, BtcEsploraClient, ChainClient, type NodeEndpoint
 import { generateMnemonic, hash256, isSchnorrEnabled, masterKeyFromSeed, mnemonicToSeed, parseAccountXpub, toHex, validateMnemonic, type HDKey, type Network } from '@qbtc/crypto'
 import type { Vault } from '@qbtc/vault'
 import { RestorableVault } from './RestorableVault'
-import { addressFromScripthash, addressFromXpub, decodeAddress, decodeWif, DOWNGRADE, exportAccountXpub, UPGRADE, validateAddress } from '../brand/crypto'
+import { addressFromScripthash, addressFromXpub, decodeAddress, DOWNGRADE, exportAccountXpub, UPGRADE, validateAddress } from '../brand/crypto'
 import { defaultNodesFor } from '../brand/nodes'
 import { PROFILE } from '../brand/profile'
-import type { AddressAlgo, KeyInspection, NodeKind, NodeSettings, NodeStatus, SendPreview, SendResult, UpgradeConvertRequest, UpgradePlanView, VaultStatus, WalletInfo, WatchInput } from '../../shared/protocol'
+import type { AddressAlgo, KeyInspection, NodeKind, NodeSettings, NodeStatus, SendPreview, SendResult, SweepScan, UpgradeConvertRequest, UpgradePlanView, VaultStatus, WalletInfo, WatchInput } from '../../shared/protocol'
 import { deriveClassicalAddress } from '../wallet/addresses'
 import { AddressService, type WalletVault } from '../wallet/AddressService'
 import { createSeedAddressSource, type AddressSource } from '../wallet/AddressSource'
 import { KeyStore } from '../wallet/keyStore'
 import { ImportedKeySession } from '../wallet/ImportedKeySession'
-import { createKeyAddressSource, importedKeyFromStored, inspectWifKey, keyReceiveOps, signUnsignedTxWithKey, type ImportedKey } from '../wallet/keyWallet'
+import { createKeyAddressSource, importedKeyFromStored, inspectWifKey, keyInputBytes, keyReceiveOps, signUnsignedTxWithKey, type ImportedKey } from '../wallet/keyWallet'
+import { encodeDelegatePubkeyhash } from '../wallet/delegation'
+import { decodeWalletWif } from '../wallet/keyWif'
 import { SeedStore } from '../wallet/seedStore'
 import { WalletBackupService } from '../wallet/WalletBackupService'
 import { createSweepSession } from '../wallet/sweep'
@@ -233,7 +235,11 @@ export function createWalletCore(): WalletCore {
       if (gatherMemo !== null && Date.now() - gatherMemo.at < GATHER_TTL_MS) return gatherMemo.promise
       const at = Date.now()
       // Reuse the chain service's shared, de-duplicated discovery — no second gap-scan.
-      const promise = (async () => gatherFromActive(await chain.spendableAddresses(), chainClient))()
+      const promise = (async () => {
+        const gathered = await gatherFromActive(await chain.spendableAddresses(), chainClient)
+        const inputBytes = keyProvider === null ? undefined : keyInputBytes(await keyProvider())
+        return inputBytes === undefined ? gathered : gathered.map((u) => ({ ...u, inputBytes }))
+      })()
       gatherMemo = { at, promise }
       promise.catch(() => {
         if (gatherMemo?.promise === promise) gatherMemo = null
@@ -421,35 +427,38 @@ export function createWalletCore(): WalletCore {
 
   // A representative address for display (the wallet's first classical receive). For a
   // seed wallet it's derived from the master key; for a watch wallet from its source
-  // (xpub or the first listed address). Best-effort: returns undefined if locked or the
-  // source can't be opened.
-  const firstAddress = async (id: string): Promise<string | undefined> => {
+  // (xpub or the first listed address), plus a public delegate identifier when present.
+  // Best-effort: omit these fields if locked or the source cannot be opened.
+  const addressInfo = async (id: string): Promise<Pick<WalletInfo, 'address' | 'delegatePubkeyhash'>> => {
     try {
       const entry = registry.get(id)
-      if (entry === undefined) return undefined
+      if (entry === undefined) return {}
       if (entry.kind === 'seed') {
         // The default wallet derives from the primary Vault; an imported seed wallet
         // from its own sealed seed.
         if (id === DEFAULT_WALLET_ID) {
-          return deriveClassicalAddress(vault.getMasterKey(), { account: 0, chain: 0, index: 0, network: NETWORK })
+          return { address: deriveClassicalAddress(vault.getMasterKey(), { account: 0, chain: 0, index: 0, network: NETWORK }) }
         }
         const seed = await new SeedStore(new FileVaultStorage(join(walletDir(userData, id), 'seed.json')), vault).load()
-        if (seed === null) return undefined
-        return deriveClassicalAddress(masterKeyFromSeed(mnemonicToSeed(seed.mnemonic, seed.passphrase)), { account: 0, chain: 0, index: 0, network: NETWORK })
+        if (seed === null) return {}
+        return { address: deriveClassicalAddress(masterKeyFromSeed(mnemonicToSeed(seed.mnemonic, seed.passphrase)), { account: 0, chain: 0, index: 0, network: NETWORK }) }
       }
       if (entry.kind === 'key') {
         // A key wallet's single address is persisted beside the sealed key.
         const stored = await new KeyStore(new FileVaultStorage(join(walletDir(userData, id), 'key.json')), vault).load()
-        return stored?.address
+        if (stored === null) return {}
+        const decoded = decodeWalletWif(stored.wif, NETWORK)
+        try { return { address: stored.address, ...(decoded.delegatePubkeyhash !== undefined ? { delegatePubkeyhash: encodeDelegatePubkeyhash(decoded.delegatePubkeyhash, NETWORK) } : {}) } }
+        finally { decoded.payload.fill(0) }
       }
       const stored = await new WatchSourceStore(new FileVaultStorage(join(walletDir(userData, id), 'watch.json')), vault).load()
-      if (stored === null) return undefined
-      if (stored.type !== 'descriptor') return stored.addresses[0]
+      if (stored === null) return {}
+      if (stored.type !== 'descriptor') return { address: stored.addresses[0] }
       // The first section is the descriptor's primary scheme (active-first on export).
       const [primary] = descriptorSchemes(stored.descriptor)
-      return primary !== undefined ? addressFromXpub(parseAccountXpub(primary.classicalXpub), 0, 0, NETWORK) : undefined
+      return { address: primary !== undefined ? addressFromXpub(parseAccountXpub(primary.classicalXpub), 0, 0, NETWORK) : undefined }
     } catch {
-      return undefined
+      return {}
     }
   }
 
@@ -463,7 +472,7 @@ export function createWalletCore(): WalletCore {
         active: e.id === activeId,
         canSign: e.kind !== 'watch',
         removable: e.id !== DEFAULT_WALLET_ID,
-        address: await firstAddress(e.id),
+        ...await addressInfo(e.id),
       })),
     )
   }
@@ -549,7 +558,7 @@ export function createWalletCore(): WalletCore {
   // Sealing needs the app-data key, so the wallet must be unlocked. Does not switch.
   const addKeyWallet = async (label: string, wif: string, algoHint?: AddressAlgo): Promise<readonly WalletInfo[]> => {
     const cleanWif = wif.trim()
-    const { payload, candidates } = decodeWif(cleanWif, NETWORK)
+    const { payload, candidates } = decodeWalletWif(cleanWif, NETWORK)
     payload.fill(0) // only the candidate list is needed here
     const algo = algoHint ?? candidates[0]
     if (algo === undefined || !candidates.includes(algo)) throw new Error('That key cannot be used with the chosen algorithm.')
@@ -575,10 +584,10 @@ export function createWalletCore(): WalletCore {
   // never written to disk or the registry. Switching the active wallet cancels it.
   const sweepSlot = new SweepSlot()
   const disposeSweep = (): void => sweepSlot.dispose()
-  const sweepScan = async (wif: string, sessionId: string, algoHint?: AddressAlgo): Promise<{ address: string; balanceAtomic: string }> => {
+  const sweepScan = async (wif: string, sessionId: string, algoHint?: AddressAlgo): Promise<SweepScan> => {
     return sweepSlot.scan(sessionId, async () => {
       const cleanWif = wif.trim()
-      const { payload, candidates } = decodeWif(cleanWif, NETWORK)
+      const { payload, candidates } = decodeWalletWif(cleanWif, NETWORK)
       payload.fill(0)
       const algo = algoHint ?? candidates[0]
       if (algo === undefined || !candidates.includes(algo)) throw new Error('That key cannot be used with the chosen algorithm.')

@@ -3,6 +3,7 @@ import type { SendPreview, TokenBalance, TokenSendPreview } from '../../shared/p
 import { formatNative, formatToken, parseNative, parseToken, tokenLabels } from '../lib/format'
 import { wallet } from '../lib/wallet'
 import { validateAmount } from '../lib/amountValidation'
+import { DelegationNotice } from '../components/DelegationNotice'
 import { coinSelectionShort, isInsufficientFundsError } from '../lib/sendValidation'
 import { invalidate, setContacts as cacheSetContacts, useActiveWallet, useAddressPlaceholder, useAssetLabel, useCoins, useContacts, useTokens } from '../lib/walletData'
 import { Alert, AlertIcon, Button, CheckIcon, ChevDownIcon, ChevRightIcon, CoinsIcon, ContactDialog, ContactIcon, CopyIcon, EyeIcon, Pill, PlusIcon, Screen, TextField } from '../ui'
@@ -287,6 +288,7 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
       <div style={{ maxWidth: 480, width: '100%', margin: '40px auto' }}>
         {(stage === 'form' || stage === 'building') && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 20 }}>
+            {activeWallet?.delegatePubkeyhash && <DelegationNotice delegatePubkeyhash={activeWallet.delegatePubkeyhash} />}
             {/* Recipient */}
             <div style={{ position: 'relative' }}>
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: 7 }}>

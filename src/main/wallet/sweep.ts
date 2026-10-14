@@ -1,9 +1,11 @@
 import type { Utxo } from '@qbtc/chain'
 import type { Network } from '@qbtc/crypto'
 import { ChainService, type ChainBackend } from './ChainService'
-import { createKeyAddressSource, signUnsignedTxWithKey, type ImportedKey } from './keyWallet'
+import { createKeyAddressSource, keyInputBytes, signUnsignedTxWithKey, type ImportedKey } from './keyWallet'
 import { SendService } from './SendService'
 import { gatherFromActive, type GatheredUtxo } from './spendable'
+import { encodeDelegatePubkeyhash } from './delegation'
+import type { SweepScan } from '../../shared/protocol'
 
 // Ephemeral "send from a private key" (sweep) session.
 //
@@ -28,10 +30,11 @@ export interface SweepBackend extends ChainBackend {
 export interface SweepSession {
   /** The key's single address (what's being swept from). */
   readonly address: string
+  readonly delegatePubkeyhash?: string
   /** The send driver — buildSend/maxSendable/confirmSend, same as any wallet. */
   readonly send: SendService
   /** Confirmed + mempool balance on the key's address, as an atomic string. */
-  scanBalance(): Promise<{ balanceAtomic: string }>
+  scanBalance(): Promise<Omit<SweepScan, 'address' | 'delegatePubkeyhash'>>
   /** Wipe the key from memory. Idempotent; the session is unusable afterwards. */
   dispose(): void
 }
@@ -41,7 +44,9 @@ export interface SweepSession {
 export function createSweepSession(backend: SweepBackend, key: ImportedKey, network: Network): SweepSession {
   const source = createKeyAddressSource(() => Promise.resolve(key))
   const chain = new ChainService(backend, source.branches)
-  const gather = async (): Promise<GatheredUtxo[]> => gatherFromActive(await chain.spendableAddresses(), backend)
+  const inputBytes = keyInputBytes(key)
+  const gather = async (): Promise<GatheredUtxo[]> => (await gatherFromActive(await chain.spendableAddresses(), backend))
+    .map((u) => inputBytes === undefined ? u : { ...u, inputBytes })
 
   const ownAddress = (): Promise<string> => Promise.resolve(key.address)
   const send = new SendService({
@@ -60,6 +65,7 @@ export function createSweepSession(backend: SweepBackend, key: ImportedKey, netw
 
   return {
     address: key.address,
+    ...(key.delegation !== undefined ? { delegatePubkeyhash: encodeDelegatePubkeyhash(key.delegation.delegatePubkeyhash, network) } : {}),
     send,
     scanBalance: async () => ({ balanceAtomic: (await chain.getSummary()).balanceAtomic }),
     dispose: () => {
