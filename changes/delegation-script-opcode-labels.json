@@ -1,0 +1,7 @@
+{
+  "id": "delegation-script-opcode-labels",
+  "scope": "shared",
+  "type": "fixed",
+  "bump": "patch",
+  "text": "Transaction details display readable operation names for delegated staking scripts."
+}

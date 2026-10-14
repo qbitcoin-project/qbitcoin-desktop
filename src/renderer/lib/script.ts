@@ -18,16 +18,20 @@ const OPCODES: Record<number, string> = {
   0x63: 'OP_IF',
   0x67: 'OP_ELSE',
   0x68: 'OP_ENDIF',
+  0x69: 'OP_VERIFY',
   0x6a: 'OP_RETURN',
   0x75: 'OP_DROP',
   0x76: 'OP_DUP',
   0x78: 'OP_OVER',
+  0x7c: 'OP_SWAP',
   // The chain's introspection opcodes (covenants: freeze/downgrade/delegation).
   0x7e: 'OP_TX_TYPE',
   0x7f: 'OP_SUBSTR',
   0x80: 'OP_OUTPUTDATA',
   0x87: 'OP_EQUAL',
   0x88: 'OP_EQUALVERIFY',
+  0x9d: 'OP_NUMEQUALVERIFY',
+  0xa2: 'OP_GREATERTHANOREQUAL',
   0xa9: 'OP_HASH160',
   0xaa: 'OP_HASH256',
   0xac: 'OP_CHECKSIG',
@@ -36,6 +40,9 @@ const OPCODES: Record<number, string> = {
   0xaf: 'OP_CHECKMULTISIGVERIFY',
   0xb1: 'OP_CHECKLOCKTIMEVERIFY',
   0xb2: 'OP_CHECKSEQUENCEVERIFY',
+  0xbb: 'OP_INPUTSCRIPTHASH',
+  0xbc: 'OP_INPUTSVALUE',
+  0xbd: 'OP_OUTPUTSVALUE',
 }
 
 function hexToBytes(hex: string): number[] {

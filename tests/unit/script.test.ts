@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { disassembleScript } from '../../src/renderer/lib/script'
+import delegationGoldens from '../fixtures/delegation.json'
 
 describe('disassembleScript', () => {
+  it.each(delegationGoldens)('names every delegation operation for $owner / $delegate', ({ script, owner, delegate }) => {
+    const hash = (h: string): string => h.length === 40 ? 'OP_HASH160 OP_PUSHBYTES_20' : 'OP_HASH256 OP_PUSHBYTES_32'
+    expect(disassembleScript(script)).toBe(`OP_IF OP_DUP ${hash(owner)} ${owner} OP_EQUALVERIFY OP_CHECKSIG OP_ELSE OP_TX_TYPE OP_PUSHBYTES_1 02 OP_NUMEQUALVERIFY OP_INPUTSCRIPTHASH OP_DUP OP_OUTPUTSVALUE OP_SWAP OP_INPUTSVALUE OP_GREATERTHANOREQUAL OP_VERIFY OP_DUP ${hash(delegate)} ${delegate} OP_EQUALVERIFY OP_CHECKSIG OP_ENDIF`)
+  })
   it('decodes a P2PK redeem script (pushdata + OP_CHECKSIG)', () => {
     const pubkey = '034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa'
     expect(disassembleScript(`21${pubkey}ac`)).toBe(`OP_PUSHBYTES_33 ${pubkey} OP_CHECKSIG`)
