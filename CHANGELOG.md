@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.5.0 — 2026-10-14
+
+### Added
+
+- Import delegated-staking private keys, receive and send from their delegated address, and back up the complete key. Key previews identify the delegate and explain staking maturity.
+
+### Changed
+
+- Keep the wallet list responsive by reading saved delegate details without decoding imported private keys again.
+- The sidebar now has a dedicated Lock wallet action at the bottom, with network and Falcon badges removed. Theme controls remain at the top, and release notes are available from Help → What’s new.
+- Reduce delays when checking, importing or sending from a private key by decoding its WIF only once per operation.
+
+### Fixed
+
+- Transaction labels are now described as local notes with clear keyboard hints. Escape cancels an edit without saving or closing the transaction drawer, and saved notes appear immediately.
+- Convert to BTC excludes maturing coins and coins with unverified maturity from the displayed available balance, so excessive amounts are rejected before review.
+- BTC conversion can now start as soon as a deposit appears in the mempool, without waiting for its first confirmation. The conversion balance includes pending deposits.
+- Delegate identifiers use the same monospace font as wallet addresses.
+- Transaction details display readable operation names for delegated staking scripts.
+- Token transfers now exclude frozen token outputs as well as frozen coins used to pay the network fee.
+- Completed conversions now show the amount received, destination address and credit time, with an explorer link to the receiving coinbase transaction. Pending conversions retain a clearly labelled source-chain link.
+- Settings no longer shows a single address for recovery-phrase wallets, which can contain multiple addresses. Use Receive to view their addresses.
+- The Falcon address shortcut now opens Receive with Falcon-512 selected. Wallets containing only a classical key no longer offer this shortcut.
+- Imported wallets show the owner's signature algorithm separately from delegated staking, so a long address no longer incorrectly implies Falcon protection.
+- Calculate network fees from transaction sizes, accounting for Falcon signatures, destination addresses, token data and conversion reclaim scripts.
+- Send, private-key sweeps and coin control show maturing staking funds and their availability time. Automatic selection, including Max without a manual selection, excludes maturing or unverified coins. Manually selected maturing coins show a confirmation delay warning.
+- Token transfers correctly fund the network fee when paying it requires several small coin outputs.
+- Rejected sends refresh the available coins and require a new review. When submission status is uncertain, checking again looks up or resends the same signed transaction without creating a new transaction ID.
+- Send and Convert now reject invalid amounts and amounts above the available balance before review, with clear messages beside the amount field.
+
+### Security
+
+- Clear imported private keys when a wallet session ends, including keys loaded by operations that finish after locking or switching wallets.
+
+### Removed
+
+- Removed the unavailable Electrum server option and its reference from connection settings.
+
 ## 1.4.0 — 2026-10-08
 
 ### Added
