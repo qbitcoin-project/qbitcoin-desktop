@@ -1,0 +1,7 @@
+{
+  "id": "imported-key-session-disposal",
+  "scope": "shared",
+  "type": "security",
+  "bump": "patch",
+  "text": "Clear imported private keys when a wallet session ends, including keys loaded by operations that finish after locking or switching wallets."
+}

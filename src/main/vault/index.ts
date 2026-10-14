@@ -15,6 +15,7 @@ import { deriveClassicalAddress } from '../wallet/addresses'
 import { AddressService, type WalletVault } from '../wallet/AddressService'
 import { createSeedAddressSource, type AddressSource } from '../wallet/AddressSource'
 import { KeyStore } from '../wallet/keyStore'
+import { ImportedKeySession } from '../wallet/ImportedKeySession'
 import { createKeyAddressSource, importedKeyFromStored, inspectWifKey, keyReceiveOps, signUnsignedTxWithKey, type ImportedKey } from '../wallet/keyWallet'
 import { SeedStore } from '../wallet/seedStore'
 import { WalletBackupService } from '../wallet/WalletBackupService'
@@ -203,21 +204,13 @@ export function createWalletCore(): WalletCore {
       // materialized key (private bytes included) is cached for the session
       // and wiped on lock/switch.
       const keyStore = new KeyStore(new FileVaultStorage(wf('key.json')), vault)
-      let cachedImported: ImportedKey | null = null
-      const getKey = async (): Promise<ImportedKey> => {
-        if (cachedImported === null) {
-          const stored = await keyStore.load()
-          if (stored === null) throw new Error('The key for this wallet is missing or could not be opened.')
-          cachedImported = await importedKeyFromStored(stored, NETWORK)
-        }
-        return cachedImported
-      }
+      const keySession = new ImportedKeySession(() => keyStore.load(), (stored) => importedKeyFromStored(stored, NETWORK))
+      const getKey = (): Promise<ImportedKey> => keySession.get()
       keyProvider = getKey
       addressSource = createKeyAddressSource(getKey)
       addresses = keyReceiveOps(getKey)
       resetSource = () => {
-        cachedImported?.privateKey.fill(0)
-        cachedImported = null
+        keySession.dispose()
         keyStore.reset()
       }
     } else {
@@ -801,6 +794,10 @@ export function createWalletCore(): WalletCore {
   vault.on((event) => {
     if (event.type === 'unlocked') {
       unlocked = true
+      // Lock permanently disposes imported-key providers. New work belongs to
+      // a fresh session; callbacks retaining the old provider stay invalid.
+      active.reset()
+      active = buildSession(registry.getActiveId())
       // Load any sealed own-node credential now the app-data key is available; if the
       // own node is active, rebuild the client with auth before warming, else just warm.
       void nodeAuthStore

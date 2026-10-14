@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { KeyStore, type StoredKey } from '../../src/main/wallet/keyStore'
 
 // In-memory blob store + a reversible (non-crypto) sealer for tests.
@@ -38,5 +38,20 @@ describe('KeyStore', () => {
     await ks.save(KEY)
     ks.reset()
     expect(await ks.load()).toEqual(KEY)
+  })
+
+  it('does not repopulate the cache when decryption finishes after reset', async () => {
+    let finish!: (value: string) => void
+    const pending = new Promise<string>((done) => { finish = done })
+    const openData = vi.fn().mockReturnValueOnce(pending).mockResolvedValue(JSON.stringify(KEY))
+    const started = { read: vi.fn(async () => 'sealed'), write: async () => {} }
+    const ks = new KeyStore(started, { ...sealer, openData })
+    const first = ks.load()
+    await Promise.resolve()
+    ks.reset()
+    finish(JSON.stringify(KEY))
+    await expect(first).rejects.toThrow(/session has changed/)
+    expect(await ks.load()).toEqual(KEY)
+    expect(openData).toHaveBeenCalledTimes(2)
   })
 })

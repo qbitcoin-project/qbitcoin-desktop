@@ -29,6 +29,7 @@ export interface StoredKey {
 export class KeyStore {
   // undefined = not loaded yet; null = loaded, none stored.
   private cache: StoredKey | null | undefined = undefined
+  private generation = 0
 
   constructor(
     private readonly store: BlobStore,
@@ -37,12 +38,16 @@ export class KeyStore {
 
   async load(): Promise<StoredKey | null> {
     if (this.cache !== undefined) return this.cache
+    const generation = this.generation
     const blob = await this.store.read()
+    if (generation !== this.generation) throw new Error('The key store session has changed.')
     if (blob === null) {
       this.cache = null
       return null
     }
-    this.cache = JSON.parse(await this.sealer.openData(blob)) as StoredKey
+    const key = JSON.parse(await this.sealer.openData(blob)) as StoredKey
+    if (generation !== this.generation) throw new Error('The key store session has changed.')
+    this.cache = key
     return this.cache
   }
 
@@ -53,6 +58,7 @@ export class KeyStore {
 
   // Drop the in-memory copy (on lock or wallet switch) without touching disk.
   reset(): void {
+    this.generation += 1
     this.cache = undefined
   }
 }
