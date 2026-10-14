@@ -1,5 +1,6 @@
 import { QRCodeSVG } from 'qrcode.react'
 import { useCallback, useEffect, useId, useMemo, useState } from 'react'
+import { isMature } from '../../shared/maturity'
 import type { DowngradeEpisodeIpcView, DowngradePlanView, UpgradeConvertRequest, UpgradePlanView, UpgradeStatusView } from '../../shared/protocol'
 import { brand } from '../brand'
 import { UpgradeConversionRow } from '../components/UpgradeConversionRow'
@@ -188,10 +189,10 @@ export function Convert() {
   const downAddrLooksValid = btcAddrLooksValid(downAddr, buildNet)
 
   // What the downgrade can spend — the same "available" the Send screen
-  // shows: unfrozen native coins (the network fee still comes out of it).
+  // shows: mature, verified, unfrozen native coins (the fee still comes out of it).
   const { data: coinsData } = useCoins()
   const downAvailable = useMemo(
-    () => (coinsData ?? []).filter((c) => !c.frozen && c.tokenId === undefined).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n),
+    () => (coinsData ?? []).filter((c) => !c.frozen && c.tokenId === undefined && isMature(c)).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n),
     [coinsData],
   )
   const downAmountCheck = validateAmount(downAmount, { available: coinsData === undefined ? null : downAvailable })

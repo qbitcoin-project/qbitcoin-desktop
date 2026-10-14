@@ -1,0 +1,7 @@
+{
+  "id": "conversion-maturity-balance",
+  "scope": "shared",
+  "type": "fixed",
+  "bump": "patch",
+  "text": "Convert to BTC excludes maturing coins and coins with unverified maturity from the displayed available balance, so excessive amounts are rejected before review."
+}

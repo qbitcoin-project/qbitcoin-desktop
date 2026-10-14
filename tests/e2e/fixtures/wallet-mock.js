@@ -7,6 +7,7 @@ const maturesAt = Math.floor(Date.now() / 1000) + 3600
 const maturingCoins = query.has('maturity') ? [
   { ...coin, outpoint: 'dd:0', valueAtomic: '200000000', maturesAt, label: 'Maturing stake' },
   { ...coin, outpoint: 'ee:0', valueAtomic: '0', tokenId: token.id, tokenAmountAtomic: '700', maturesAt },
+  { ...coin, outpoint: 'ff:0', valueAtomic: '400000000', maturityUnknown: true },
 ] : []
 const wallets = [{ id: 'main', label: 'Main Wallet', kind: query.has('key') ? 'key' : 'seed', active: true, canSign: true, removable: false, address }]
 if (query.has('accounts')) wallets.push({ id: 'imported', label: 'Imported key', kind: 'key', active: false, canSign: true, removable: true, address: 'single-key-test-address' })
