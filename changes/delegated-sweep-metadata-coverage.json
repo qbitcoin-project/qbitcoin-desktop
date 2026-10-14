@@ -1,0 +1,7 @@
+{
+  "id": "delegated-sweep-metadata-coverage",
+  "scope": "shared",
+  "type": "internal",
+  "bump": "none",
+  "text": "Add regression coverage for preserving public delegate metadata between private-key sweep steps."
+}

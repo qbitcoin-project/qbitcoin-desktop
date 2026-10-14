@@ -33,3 +33,19 @@ test('manual coin selection warns about maturity in the picker and review', asyn
     await expect(page.getByText(/This transaction cannot confirm before/)).toBeVisible()
   } finally { await app.close() }
 })
+
+test('delegated sweep preserves its notice and maturity balance after leaving key entry', async () => {
+  const { app, page } = await launchWalletUi('sweep=1')
+  try {
+    const dialog = page.getByRole('dialog')
+    await dialog.getByRole('button', { name: 'Enter private key', exact: true }).click()
+    await dialog.getByLabel('Private key', { exact: true }).fill('synthetic-fixture-key')
+    await expect(dialog.getByText('synthetic-delegate-public-hash', { exact: true })).toBeVisible()
+    await dialog.getByRole('button', { name: 'Continue', exact: true }).click()
+    await expect(dialog.getByLabel('Private key', { exact: true })).toHaveCount(0)
+    await expect(dialog.getByText('Delegated staking', { exact: true })).toBeVisible()
+    await expect(dialog.getByText('synthetic-delegate-public-hash', { exact: true })).toBeVisible()
+    await expect(dialog.getByText('Available now', { exact: true })).toBeVisible()
+    await expect(dialog.getByText(/^Maturing: 2 /)).toBeVisible()
+  } finally { await app.close() }
+})

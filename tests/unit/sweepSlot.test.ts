@@ -14,6 +14,16 @@ function session(scanBalance = async () => ({ balanceAtomic: '0' })) {
 }
 
 describe('sweep cancellation ownership', () => {
+  it('keeps delegate details in the scanned result shown on the amount step', async () => {
+    const slot = new SweepSlot()
+    const key = session(async () => ({ balanceAtomic: '123' }))
+    const delegated = { ...key.value, delegatePubkeyhash: 'public-delegate-id' }
+    expect(await slot.scan('delegated', async () => delegated)).toEqual({ address: 'test-address', balanceAtomic: '123', delegatePubkeyhash: 'public-delegate-id' })
+    const ordinary = session()
+    expect(await slot.scan('ordinary', async () => ordinary.value)).toEqual({ address: 'test-address', balanceAtomic: '0' })
+    expect(key.dispose).toHaveBeenCalled()
+    slot.dispose()
+  })
   it('wipes a key created after its scan was cancelled', async () => {
     const slot = new SweepSlot()
     const key = session()
