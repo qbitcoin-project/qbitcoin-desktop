@@ -89,6 +89,10 @@ export async function importedKeyFromStored(stored: StoredKey, network: Network)
       key.privateKey.fill(0)
       throw new Error('Stored key data is inconsistent (address mismatch) — refusing to use it.')
     }
+    if (stored.delegatePubkeyhash !== undefined &&
+        (delegatePubkeyhash === undefined || stored.delegatePubkeyhash !== encodeDelegatePubkeyhash(delegatePubkeyhash, network))) {
+      throw new Error('Stored key data is inconsistent (delegate mismatch) — refusing to use it.')
+    }
     return key
   } catch (error) {
     materialized?.privateKey.fill(0)

@@ -1,0 +1,7 @@
+{
+  "id": "key-wallet-list-metadata",
+  "scope": "shared",
+  "type": "changed",
+  "bump": "patch",
+  "text": "Keep the wallet list responsive by reading saved delegate details without decoding imported private keys again."
+}

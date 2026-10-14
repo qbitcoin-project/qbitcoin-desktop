@@ -447,9 +447,7 @@ export function createWalletCore(): WalletCore {
         // A key wallet's single address is persisted beside the sealed key.
         const stored = await new KeyStore(new FileVaultStorage(join(walletDir(userData, id), 'key.json')), vault).load()
         if (stored === null) return {}
-        const decoded = decodeWalletWif(stored.wif, NETWORK)
-        try { return { address: stored.address, ...(decoded.delegatePubkeyhash !== undefined ? { delegatePubkeyhash: encodeDelegatePubkeyhash(decoded.delegatePubkeyhash, NETWORK) } : {}) } }
-        finally { decoded.payload.fill(0) }
+        return { address: stored.address, ...(stored.delegatePubkeyhash !== undefined ? { delegatePubkeyhash: stored.delegatePubkeyhash } : {}) }
       }
       const stored = await new WatchSourceStore(new FileVaultStorage(join(walletDir(userData, id), 'watch.json')), vault).load()
       if (stored === null) return {}
@@ -572,7 +570,9 @@ export function createWalletCore(): WalletCore {
 
     const id = randomUUID()
     const store = new KeyStore(new FileVaultStorage(join(walletDir(userData, id), 'key.json')), vault)
-    await store.save({ wif: cleanWif, algo, address: key.address })
+    await store.save({ wif: cleanWif, algo, address: key.address,
+      ...(key.delegation !== undefined ? { delegatePubkeyhash: encodeDelegatePubkeyhash(key.delegation.delegatePubkeyhash, NETWORK) } : {}),
+    })
     const name = label.trim()
     registry.add({ id, kind: 'key', label: name === '' ? 'Imported key' : name, createdAt: Date.now() })
     clearImportedKeyClipboard(clipboard, cleanWif)

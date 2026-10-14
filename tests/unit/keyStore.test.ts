@@ -40,6 +40,13 @@ describe('KeyStore', () => {
     expect(await ks.load()).toEqual(KEY)
   })
 
+  it('persists public delegation metadata without needing to parse WIF for display', async () => {
+    const store = fakeStore()
+    const delegated = { ...KEY, delegatePubkeyhash: 'public-delegate-id' }
+    await new KeyStore(store, sealer).save(delegated)
+    expect(await new KeyStore(store, sealer).load()).toEqual(delegated)
+  })
+
   it('does not repopulate the cache when decryption finishes after reset', async () => {
     let finish!: (value: string) => void
     const pending = new Promise<string>((done) => { finish = done })

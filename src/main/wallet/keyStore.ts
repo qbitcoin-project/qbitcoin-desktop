@@ -23,6 +23,8 @@ export interface StoredKey {
   readonly algo: Algorithm
   /** The key's single address (derived at import; display + duplicate checks). */
   readonly address: string
+  /** Public display metadata derived at import; never decode WIF to list wallets. */
+  readonly delegatePubkeyhash?: string
 }
 
 // Sealed-at-rest store for one imported key (one per key wallet, under its dir).
