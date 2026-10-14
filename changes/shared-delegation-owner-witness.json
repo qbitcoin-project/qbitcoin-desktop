@@ -1,0 +1,7 @@
+{
+  "id": "shared-delegation-owner-witness",
+  "scope": "shared",
+  "type": "internal",
+  "bump": "none",
+  "text": "Use one delegated owner input builder for transaction signing and serialized size estimation."
+}

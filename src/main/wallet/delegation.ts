@@ -1,8 +1,13 @@
-import { encodeBase58Check, hash160, hash256, opPushdata, type Algorithm, type Network } from '@qbtc/crypto'
+import { encodeBase58Check, hash160, hash256, opPushdata, type Algorithm, type Network, type TxInput } from '@qbtc/crypto'
 import { addressFromScripthash } from '../brand/crypto'
 import { DELEGATION } from '../brand/delegation'
 
 const concat = (...parts: Uint8Array[]): Uint8Array => Uint8Array.from(parts.flatMap((p) => [...p]))
+
+/** The owner branch witness, shared by signing and serialized-size estimation. */
+export function delegatedOwnerInput(input: TxInput, signature: Uint8Array, publicKey: Uint8Array, redeemScript: Uint8Array): TxInput {
+  return { ...input, redeemScript, siglist: [signature, publicKey, Uint8Array.of(1)] }
+}
 
 function hashOp(hash: Uint8Array): number {
   if (hash.length === 20) return 0xa9

@@ -25,7 +25,7 @@ import type { UnsignedTx } from './buildTx'
 import type { StoredKey } from './keyStore'
 import { toCryptoTransaction, type SignedTx } from './signTx'
 import { decodeWalletWif, type WalletWif } from './keyWif'
-import { delegationAddress, delegationScript, encodeDelegatePubkeyhash, ownerPubkeyhash } from './delegation'
+import { delegatedOwnerInput, delegationAddress, delegationScript, encodeDelegatePubkeyhash, ownerPubkeyhash } from './delegation'
 import { serializedInputBytes, signaturePlaceholder } from './txSize'
 
 // A single imported private key (kind: 'key' wallet) — the building blocks.
@@ -197,7 +197,7 @@ export async function signUnsignedTxWithKey(unsigned: UnsignedTx, key: ImportedK
   else {
     const digest = sighash(tx, SIGHASH.ALL, sighashCommitsTokenId(network))
     const signature = encodeSiglistEntry(SIGHASH.ALL, key.algo, await signWithAlgorithm(digest, key.privateKey, key.algo))
-    signed = { ...tx, inputs: tx.inputs.map((input) => ({ ...input, redeemScript: delegation.redeemScript, siglist: [signature, key.publicKey, Uint8Array.of(1)] })) }
+    signed = { ...tx, inputs: tx.inputs.map((input) => delegatedOwnerInput(input, signature, key.publicKey, delegation.redeemScript)) }
   }
   return { rawHex: toHex(serialize(signed)), txid: toHex(computeTxid(signed)) }
 }
@@ -206,7 +206,6 @@ export async function signUnsignedTxWithKey(unsigned: UnsignedTx, key: ImportedK
  * key and branch selector. Ordinary inputs are sized by the shared estimator. */
 export function keyInputBytes(key: ImportedKey): number | undefined {
   if (key.delegation === undefined) return undefined
-  return serializedInputBytes({ txid: new Uint8Array(32), vout: 0xffffffff, redeemScript: key.delegation.redeemScript,
-    siglist: [signaturePlaceholder(key.algo), key.publicKey, Uint8Array.of(1)],
-  })
+  return serializedInputBytes(delegatedOwnerInput({ txid: new Uint8Array(32), vout: 0xffffffff },
+    signaturePlaceholder(key.algo), key.publicKey, key.delegation.redeemScript))
 }
