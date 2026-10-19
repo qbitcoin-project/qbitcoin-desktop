@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { AlertIcon, CheckIcon, CloseIcon, RefreshIcon } from './icons'
+import { AlertIcon, CheckIcon, CloseIcon, InfoIcon, RefreshIcon } from './icons'
 
 // Shared notice box. Every icon+text notice in the app renders through
 // this component, so the icon is always 16px (wrapped flex-none - a long
@@ -12,11 +12,12 @@ import { AlertIcon, CheckIcon, CloseIcon, RefreshIcon } from './icons'
 //   warning - urgent inline box: warning-tinted surface and text
 //             (fee shortfalls on Send).
 //   caution - inline caution on a neutral well: the text is ordinary ink,
-//             only the icon carries the warning colour (one-way notes,
-//             dialog fine print).
+//             only the icon carries the warning colour (dialog fine print).
+//   note    - the same quiet well with an "i" in muted ink: information to
+//             read before acting that is not a warning (Convert terms).
 //   chip    - compact single-line hint (the "not in your contacts" nudge).
 //   success/error/info - operation feedback, with distinct icons and colours.
-export type AlertVariant = 'banner' | 'warning' | 'caution' | 'chip' | 'success' | 'error' | 'info'
+export type AlertVariant = 'banner' | 'warning' | 'caution' | 'note' | 'chip' | 'success' | 'error' | 'info'
 
 const feedbackBox = (color: string): React.CSSProperties => ({
   gap: 10, padding: '12px 14px', borderRadius: 12,
@@ -31,6 +32,7 @@ const BOX: Record<AlertVariant, React.CSSProperties> = {
   banner: { gap: 10, padding: '12px 14px', borderRadius: 12, background: 'var(--card)', border: '1px solid var(--warning)' },
   warning: { gap: 9, padding: '11px 13px', borderRadius: 10, background: 'color-mix(in srgb, var(--warning) 14%, transparent)', border: '1px solid color-mix(in srgb, var(--warning) 32%, transparent)' },
   caution: { gap: 9, padding: '10px 12px', borderRadius: 10, background: 'var(--well)', border: '1px solid var(--border)' },
+  note: { gap: 9, padding: '10px 12px', borderRadius: 10, background: 'var(--well)', border: '1px solid var(--border)' },
   chip: { gap: 6, padding: '7px 10px', borderRadius: 8, background: 'color-mix(in srgb, var(--warning) 13%, transparent)' },
 }
 
@@ -41,15 +43,17 @@ const TEXT: Record<AlertVariant, React.CSSProperties> = {
   banner: { fontSize: 12.5, color: 'var(--ink-700)', lineHeight: 1.5 },
   warning: { fontSize: 12.5, color: 'var(--ink-700)', lineHeight: 1.5 },
   caution: { fontSize: 12, color: 'var(--ink-700)', lineHeight: 1.5 },
+  note: { fontSize: 12, color: 'var(--ink-700)', lineHeight: 1.5 },
   chip: { fontSize: 12, color: 'var(--warning)', fontWeight: 500 },
 }
 
 export function Alert({ variant = 'caution', children, style }: { variant?: AlertVariant; children: ReactNode; style?: React.CSSProperties }) {
-  const Icon = variant === 'success' ? CheckIcon : variant === 'error' ? CloseIcon : variant === 'info' ? RefreshIcon : AlertIcon
-  const color = variant === 'success' ? 'var(--success)' : variant === 'error' ? 'var(--danger)' : variant === 'info' ? 'var(--ink-500)' : 'var(--warning)'
+  const Icon = variant === 'success' ? CheckIcon : variant === 'error' ? CloseIcon : variant === 'info' ? RefreshIcon : variant === 'note' ? InfoIcon : AlertIcon
+  const color = variant === 'success' ? 'var(--success)' : variant === 'error' ? 'var(--danger)' : variant === 'info' || variant === 'note' ? 'var(--ink-500)' : 'var(--warning)'
   return (
     <div
       role={variant === 'error' ? 'alert' : 'status'}
+      data-variant={variant}
       style={{ display: 'flex', alignItems: variant === 'chip' ? 'center' : 'flex-start', ...BOX[variant], ...style }}
     >
       <span aria-hidden="true" style={{ flex: 'none', color, display: 'flex', marginTop: variant === 'chip' ? 0 : 1 }}>

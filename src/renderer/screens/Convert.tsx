@@ -391,10 +391,10 @@ export function Convert() {
                 placeholder={addressHint}
                 aria-label="Destination address"
               />
-              <Alert variant="caution">
+              <Alert variant="note">
                 <span>
-                  Conversion is one-way and cannot be undone. The {nativeLabel} amount follows the protocol rate at
-                  credit time (≈1% protocol fee applies) and arrives after ~3–4 hours.
+                  You’ll receive {nativeLabel} at the protocol rate at credit time, minus a ≈1% protocol fee, in about
+                  3–4 hours.
                 </span>
               </Alert>
               {error !== null && <div className="field-hint field-hint--error">{error}</div>}
@@ -571,8 +571,8 @@ export function Convert() {
                     service picks the conversion up. If nothing picks it up within 48 hours, you can reclaim the
                     {' '}{nativeLabel} below.
                   </div>
-                  <Alert variant="caution">
-                    Once the service picks it up, the conversion is one-way and cannot be undone.
+                  <Alert variant="note">
+                    Once the service picks it up, this conversion can’t be cancelled.
                   </Alert>
                   {downError !== null && <div className="field-hint field-hint--error">{downError}</div>}
                   <div style={{ display: 'flex', gap: 10 }}>
