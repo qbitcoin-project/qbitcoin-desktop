@@ -10,7 +10,7 @@ import { AtomIcon, Button, ChevRightIcon, ReceiveIcon, Screen, SendIcon, TokenGl
 // Unlocked dashboard: a balance hero + quick actions + recent activity, matching
 // the design's exact spec. Reads come from the shared wallet-data cache (served
 // instantly on revisit, refreshed in the background); it holds no keys.
-export function WalletHome({ onSend, onReceive, onReceiveFalcon, onSeeAll, onSendToken }: { onSend: () => void; onReceive: () => void; onReceiveFalcon: () => void; onSeeAll: () => void; onSendToken: (token: TokenBalance) => void }) {
+export function WalletHome({ onSend, onReceive, onReceiveFalcon, onSeeAll, onSendToken, onStake }: { onSend: () => void; onReceive: () => void; onReceiveFalcon: () => void; onSeeAll: () => void; onSendToken: (token: TokenBalance) => void; onStake?: () => void }) {
   const { data: summary, loading } = useSummary()
   const { data: historyData, error } = useHistory()
   const history = historyData?.items
@@ -30,8 +30,10 @@ export function WalletHome({ onSend, onReceive, onReceiveFalcon, onSeeAll, onSen
           {/* Main column: balance hero + recent activity */}
           <div style={{ flex: '1 1 0', minWidth: 380, width: '100%' }}>
             <div style={{ background: 'radial-gradient(135% 150% at 0% 0%, color-mix(in srgb, var(--primary) 20%, var(--card)) 0%, var(--card) 52%)', border: '1px solid var(--border)', borderRadius: 18, padding: '26px 28px 24px' }}>
-              <div style={{ fontSize: 13, color: 'var(--ink-500)', fontWeight: 500 }}>Total balance</div>
-              <KeyOwnerBadge wallet={activeWallet} />
+              <div style={{display: 'flex', justifyContent: 'space-between', gap: 8}}>
+                <div style={{ fontSize: 13, color: 'var(--ink-500)', fontWeight: 500 }}>Total balance</div>
+                <KeyOwnerBadge wallet={activeWallet} />
+              </div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
                 {summary !== undefined ? (
                   <>
@@ -44,6 +46,9 @@ export function WalletHome({ onSend, onReceive, onReceiveFalcon, onSeeAll, onSen
                   <span style={{ fontSize: 42, fontWeight: 600, color: 'var(--ink-500)', lineHeight: 1 }}>{loading ? '…' : '—'}</span>
                 )}
               </div>
+              {summary?.delegatedAtomic !== undefined && <p style={{ fontSize: 13, color: 'var(--ink-500)', marginBottom: 0 }}>
+                Ordinary: {formatNative(summary.ordinaryAtomic ?? '0')} {asset} · Delegated: {formatNative(summary.delegatedAtomic)} {asset}
+              </p>}
               <div style={{ display: 'flex', gap: 12, marginTop: 24, flexWrap: 'wrap' }}>
                 <Button onClick={onSend}>
                   <SendIcon size={16} />
@@ -53,6 +58,7 @@ export function WalletHome({ onSend, onReceive, onReceiveFalcon, onSeeAll, onSen
                   <ReceiveIcon size={16} />
                   Receive
                 </Button>
+                {onStake !== undefined && <Button variant="secondary" onClick={onStake}>Staking</Button>}
               </div>
             </div>
 

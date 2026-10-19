@@ -2,7 +2,7 @@ import type { AddressInfo, Utxo } from '@qbtc/chain'
 import { deserialize, fromHex, getPublicKey, scriptP2PK, SIGHASH, sighash, toHex, verifySiglistEntry } from '@qbtc/crypto'
 import { addressFromPubkey, decodeAddress, encodeWif, sighashCommitsTokenId } from '../../src/main/brand/crypto'
 import { describe, expect, it } from 'vitest'
-import { importedKeyFromStored, type ImportedKey } from '../../src/main/wallet/keyWallet'
+import { importedKeyFromStored, ordinaryKeyAddress, type ImportedKey } from '../../src/main/wallet/keyWallet'
 import { createSweepSession, type SweepBackend } from '../../src/main/wallet/sweep'
 import { delegatedKeyFixture } from '../fixtures/delegatedKey'
 
@@ -99,17 +99,24 @@ describe('delegated-key sends and sweeps', () => {
   for (const algo of ['ecdsa', 'falcon512'] as const) {
     for (const length of [20, 32] as const) {
       for (const mode of ['auto', 'manual', 'max', 'token'] as const) {
-        it(`${algo}/${length}: ${mode} pays for its serialized size and preserves the delegation on change`, async () => {
+        it(`${algo}/${length}: ${mode} pays for its serialized size and returns change to the ordinary owner address`, async () => {
           const { wif } = await delegatedKeyFixture(algo, length)
           const key = await importedKeyFromStored({ wif, algo, address: '' }, 'mainnet')
           const coins: Utxo[] = [utxo(1, 200_000n), utxo(2, 300_000n)]
           const tokenId = 'ef'.repeat(32)
           if (mode === 'token') coins.push({ ...utxo(3, 0n), tokenId, tokenAmount: 500n })
           let raw = ''
-          const session = createSweepSession(backend(key, coins, (hex) => { raw = hex }), key, 'mainnet')
+          const reader = backend(key, coins, (hex) => { raw = hex })
+          const ordinary = ordinaryKeyAddress(key, 'mainnet')
+          const ordinaryReader = backend({ ...key, address: ordinary }, coins)
+          reader.getAddressInfo = async (address) => address === ordinary ? ordinaryReader.getAddressInfo(address) : backend(key, coins).getAddressInfo(address)
+          reader.listUnspent = async (address) => address === ordinary ? coins : coins.map((u) => ({ ...u, txid: '99'.repeat(32) }))
+          const session = createSweepSession(reader, key, 'mainnet')
           try {
             expect(session.delegatePubkeyhash).toBeDefined()
-            expect((await session.scanBalance()).balanceAtomic).toBe('500000')
+            expect(await session.scanBalance()).toMatchObject({ balanceAtomic: '1000000', availableAtomic: '500000' })
+            await expect(session.send.buildSend(RECIPIENT, 900000n)).rejects.toThrow(/Not enough balance/)
+            await expect(session.send.maxSendable(['99'.repeat(32) + ':1'])).rejects.toThrow(/Unstake/)
             const manual = mode === 'manual' ? coins.slice(0, 1).map((u) => `${u.txid}:${u.vout}`) : undefined
             const max = mode === 'max' ? await session.send.maxSendable() : undefined
             const preview = mode === 'token'
@@ -124,7 +131,7 @@ describe('delegated-key sends and sweeps', () => {
             const fee = BigInt(preview.feeAtomic)
             // The session's fee estimate selects the backend's six-block rate.
             expect(fee).toBeGreaterThanOrEqual(BigInt(raw.length / 2 * 5))
-            const ownHash = decodeAddress(key.address).scripthash
+            const ownHash = decodeAddress(addressFromPubkey(key.publicKey, algo, 'mainnet')).scripthash
             if (mode === 'max') expect(tx.outputs).toHaveLength(1)
             else expect(tx.outputs.slice(1).every((o) => toHex(o.scripthash) === toHex(ownHash))).toBe(true)
             if (mode === 'manual') {
@@ -138,8 +145,8 @@ describe('delegated-key sends and sweeps', () => {
             }
             const digest = sighash(tx, SIGHASH.ALL, sighashCommitsTokenId('mainnet'))
             for (const input of tx.inputs) {
-              expect(input.redeemScript).toEqual(key.delegation!.redeemScript)
-              expect(input.siglist![2]).toEqual(Uint8Array.of(1))
+              expect(input.redeemScript).toEqual(scriptP2PK(key.publicKey))
+              expect(input.siglist).toHaveLength(1)
               expect(await verifySiglistEntry(input.siglist![0]!, digest, key.publicKey)).toBe(true)
             }
           } finally { session.dispose() }

@@ -6,7 +6,7 @@ import { useAdvancedMode } from '../lib/prefs'
 import { disassembleScript } from '../lib/script'
 import { assetLabelFor } from '../brand/labels'
 import { loadTxDetail, loadTxRaw, saveTxLabel, useAssetLabel, useBuildNetwork, useHistory, useTokens } from '../lib/walletData'
-import { ChevDownIcon, CloseIcon, CopyIcon, CopyValue, ExternalIcon, LabelInput, PencilIcon } from '../ui'
+import { Alert, ChevDownIcon, CloseIcon, CopyIcon, CopyValue, ExternalIcon, LabelInput, PencilIcon } from '../ui'
 import { TxTypeBadge } from './TxTypeBadge'
 
 // Block explorer the "Explorer" button opens (brand-configured; hidden when the
@@ -174,6 +174,9 @@ export function TxDetailDrawer({ tx, onClose }: { tx: HistoryItem; onClose: () =
               </div>
             ) : (
               <>
+                {detail.ownershipIncomplete && <Alert style={{ marginBottom: 12 }}>
+                  Transaction data is available, but staking addresses could not be checked. Some ownership labels are unknown. Open Staking for details.
+                </Alert>}
                 <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
                   <FlowChip label="Total in" value={`${formatNative(detail.totalInAtomic)} ${asset}`} />
                   <FlowChip label="Total out" value={`${formatNative(detail.totalOutAtomic)} ${asset}`} />
@@ -371,7 +374,8 @@ function IoList({
             )}
             {e.own && <Badge text="YOU" color="var(--primary)" bg="var(--primary-soft)" />}
             {e.pq && <Badge text="PQ" color="var(--pq)" bg="var(--pq-soft)" />}
-            {kind === 'out' && <OutTag own={e.own} incoming={incoming} />}
+            {e.ownershipUnknown && <Badge text="Ownership unknown" color="var(--ink-500)" bg="var(--well)" />}
+            {kind === 'out' && !e.ownershipUnknown && <OutTag own={e.own} incoming={incoming} />}
           </div>
           {advanced && <IoAdvanced e={e} kind={kind} />}
         </div>

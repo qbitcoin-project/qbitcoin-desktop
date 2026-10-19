@@ -2,6 +2,7 @@
 // (which owns the Vault). Security boundary: the master seed and BIP-32 key
 // never cross it. Explicit re-authenticated backup requests can return mnemonic,
 // passphrase or WIF; other replies contain only public data and signing results.
+import type { StakingFundingRequest, StakingWithdrawalRequest, StakingInfo, StakingPreview, StakingResult, StakingSnapshot } from './staking'
 export const WALLET_CHANNEL = 'wallet:request' as const
 
 // main → renderer status broadcasts (e.g. when autolock fires).
@@ -100,6 +101,15 @@ export type VaultRequest =
   | { readonly type: 'downgrade.plan'; readonly amountAtomic: string }
   | { readonly type: 'downgrade.convert'; readonly amountAtomic: string; readonly btcAddress: string }
   | { readonly type: 'downgrade.reclaim'; readonly freezeTxid: string }
+  | { readonly type: 'staking.info' }
+  | { readonly type: 'staking.list' }
+  | { readonly type: 'staking.refresh' }
+  | { readonly type: 'staking.buildFunding'; readonly request: StakingFundingRequest }
+  | { readonly type: 'staking.buildWithdrawal'; readonly request: StakingWithdrawalRequest }
+  | { readonly type: 'staking.confirm'; readonly draftId: string }
+  | { readonly type: 'staking.retry'; readonly operationId: string }
+  | { readonly type: 'staking.buildRecovery'; readonly operationId: string }
+  | { readonly type: 'staking.setAutoRetry'; readonly operationId: string; readonly enabled: boolean }
 
 // --- BTC→native upgrade (dormant unless the brand configures it) ---
 // Satoshi amounts are strings across the bridge, like atomic amounts.
@@ -197,7 +207,10 @@ export interface UpgradeReturnResult {
 // Atomic amounts are strings here: bigint is correct inside main but doesn't
 // belong in display state or structured-clone payloads.
 export interface WalletSummary {
+  readonly readWarning?: string
   readonly balanceAtomic: string
+  readonly delegatedAtomic?: string
+  readonly ordinaryAtomic?: string
   readonly tipHeight: number
   readonly addressCount: number
 }
@@ -228,6 +241,7 @@ export interface HistoryItem {
 
 // A slice of history plus whether older transactions remain to be loaded.
 export interface HistoryPage {
+  readonly readWarning?: string
   readonly items: readonly HistoryItem[]
   readonly hasMore: boolean
 }
@@ -240,6 +254,8 @@ export interface TxIoEntry {
   readonly address?: string
   readonly own: boolean
   readonly pq: boolean
+  /** The address index is incomplete; false own/pq values are not definitive. */
+  readonly ownershipUnknown?: boolean
   readonly tokenId?: string
   readonly tokenAmountAtomic?: string
   // ── Advanced detail (always populated; shown only in advanced mode) ──
@@ -269,6 +285,7 @@ export interface TxDetail {
   readonly feeAtomic: string
   readonly inputs: readonly TxIoEntry[]
   readonly outputs: readonly TxIoEntry[]
+  readonly ownershipIncomplete?: boolean
   // ── Advanced detail (always populated; shown only in advanced mode) ──
   /** tx_type id: 1 = standard, 2 = stake, 3 = coinbase, 4 = tokens,
    *  5 = slashing, 6 = burn, 7 = downgrade, 8 = upgrade stop, 0 = unknown. */
@@ -371,6 +388,9 @@ export interface MaxSendable {
 
 // A coin-control row: one UTXO with display fields and local metadata.
 export interface UtxoView {
+  readonly delegated?: boolean
+  readonly reservedBy?: string
+  readonly availabilityUnknown?: boolean
   readonly maturesAt?: number
   readonly maturityUnknown?: boolean
   readonly outpoint: string
@@ -682,6 +702,15 @@ export interface WalletApi {
   downgradeConvert(amountAtomic: string, btcAddress: string): Promise<{ txid: string }>
   /** Reclaim a matured freeze/downgrade output back to the wallet. */
   downgradeReclaim(freezeTxid: string): Promise<{ txid: string }>
+  stakingInfo(): Promise<StakingInfo>
+  stakingList(): Promise<StakingSnapshot>
+  stakingRefresh(): Promise<StakingSnapshot>
+  stakingBuildFunding(request: StakingFundingRequest): Promise<StakingPreview>
+  stakingBuildWithdrawal(request: StakingWithdrawalRequest): Promise<StakingPreview>
+  stakingConfirm(draftId: string): Promise<StakingResult>
+  stakingRetry(operationId: string): Promise<StakingResult>
+  stakingBuildRecovery(operationId: string): Promise<StakingPreview>
+  stakingSetAutoRetry(operationId: string, enabled: boolean): Promise<void>
   /** Subscribe to status changes pushed from main; returns an unsubscribe fn. */
   onStatusChanged(listener: (status: VaultStatus) => void): () => void
 }

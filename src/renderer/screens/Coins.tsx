@@ -1,3 +1,4 @@
+import { ordinaryCoinAvailable } from '../../shared/coinAvailability'
 import { useRef, useState, type ReactNode } from 'react'
 import type { UtxoView } from '../../shared/protocol'
 import { isMature } from '../../shared/maturity'
@@ -26,11 +27,12 @@ export function Coins({ onSendSelected }: { onSendSelected: (outpoints: string[]
   const { data: tokensData } = useTokens()
   const coins = coinsData ?? null
   const tokenById = new Map((tokensData ?? []).map((t) => [t.id, t] as const))
-  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
+  const [selection, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   const [search, setSearch] = useState('')
   const asset = useAssetLabel()
+  const selected = new Set([...selection].filter((id) => coins?.some((coin) => coin.outpoint === id && ordinaryCoinAvailable(coin) && !coin.maturityUnknown && coin.tokenId === undefined)))
 
   // Optimistic edit of the shared coin list; on a failed write we reload the
   // truth from the node (invalidate), which also reverts the optimistic change.
@@ -90,13 +92,13 @@ export function Coins({ onSendSelected }: { onSendSelected: (outpoints: string[]
   // its own row, never counted as spendable/frozen native value or as a native coin.
   const nativeCoins = list.filter((c) => c.tokenId === undefined)
   const frozenTotal = nativeCoins.filter((c) => c.frozen).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n)
-  const spendableTotal = nativeCoins.filter((c) => !c.frozen && isMature(c)).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n)
-  const maturingTotal = nativeCoins.filter((c) => !c.frozen && !c.maturityUnknown && !isMature(c)).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n)
+  const spendableTotal = nativeCoins.filter((c) => ordinaryCoinAvailable(c) && isMature(c)).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n)
+  const maturingTotal = nativeCoins.filter((c) => ordinaryCoinAvailable(c) && !c.maturityUnknown && !isMature(c)).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n)
   const selectedTotal = nativeCoins.filter((c) => selected.has(c.outpoint)).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n)
 
   const q = search.trim().toLowerCase()
   const filtered = list.filter((c) => {
-    if (filter === 'spendable' && (c.frozen || !isMature(c))) return false
+    if (filter === 'spendable' && (!ordinaryCoinAvailable(c) || !isMature(c))) return false
     if (filter === 'frozen' && !c.frozen) return false
     if (filter === 'tokens' && c.tokenId === undefined) return false
     if (q !== '' && !(c.address.toLowerCase().includes(q) || (c.label ?? '').toLowerCase().includes(q))) return false
@@ -248,7 +250,7 @@ function CoinRow({
   const primary = coin.label ?? coin.address
   // Token UTXOs aren't selectable for coin-control (which builds a native send); they
   // can still be labelled and frozen.
-  const selectable = !coin.frozen && !coin.maturityUnknown && tokenAsset === undefined
+  const selectable = ordinaryCoinAvailable(coin) && !coin.maturityUnknown && tokenAsset === undefined
   return (
     <div className="coin-row" style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '12px 16px', borderTop: '1px solid var(--border)', boxShadow: `inset 3px 0 0 ${coin.frozen ? 'var(--frozen)' : 'transparent'}` }}>
       <button
@@ -280,6 +282,9 @@ function CoinRow({
         ) : (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              {coin.delegated && <span>Staking · unstake before sending</span>}
+              {coin.reservedBy !== undefined && <span title={coin.reservedBy}>Reserved by a pending transaction</span>}
+              {coin.availabilityUnknown && <span>Spending unavailable · restore staking data</span>}
               <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink-900)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 240 }}>{primary}</span>
               <button type="button" ref={editButton} className="coin-pencil" onClick={() => setEditing(true)} title="Edit label" aria-label="Edit label" style={{ flex: 'none', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', borderRadius: 6, cursor: 'pointer', color: 'var(--ink-500)' }}>
                 <PencilIcon size={13} />

@@ -1,0 +1,230 @@
+.staking-page { max-width: 880px; margin: 0 auto; padding: 24px 32px 44px; display: grid; gap: 24px; color: var(--ink-700); }
+/* Zero-specificity reset, so single classes below can set their own spacing. */
+.staking-page :where(p, h2, h3) { margin: 0; }
+.staking-muted { font-size: 12.5px; color: var(--ink-500); }
+.staking-hint { margin-top: 7px; font-size: 12px; color: var(--ink-500); }
+.staking-code { font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
+.staking-strong { font-weight: 600; }
+.staking-none { font-weight: 500; color: var(--ink-500); }
+.staking-feedback { scroll-margin-block: 16px; }
+.staking-section-title { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink-900); }
+.staking-link {
+  display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none;
+  color: var(--primary); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.staking-link:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
+.staking-link:disabled { color: var(--ink-300); cursor: default; }
+
+/* Amounts: the number carries the weight, the ticker stays quiet. */
+.staking-amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.staking-amount-ticker { font-size: 0.86em; font-weight: 500; color: var(--ink-500); }
+.staking-amount--big .staking-amount-number { font-family: var(--display-font); font-size: 38px; font-weight: 650; letter-spacing: -0.025em; line-height: 1.1; color: var(--ink-900); }
+.staking-amount--big .staking-amount-ticker { font-size: 15px; font-weight: 600; }
+.staking-amount--mid .staking-amount-number { font-family: var(--display-font); font-size: 22px; font-weight: 600; letter-spacing: -0.018em; line-height: 1.2; color: var(--ink-900); }
+.staking-amount--mid .staking-amount-ticker { font-size: 13px; font-weight: 600; }
+
+/* Composition bar: available, held, unlocking, unknown, pending. */
+.staking-bar { display: flex; gap: 3px; height: 10px; }
+.staking-bar--small { height: 6px; gap: 2px; }
+.staking-bar--empty { border-radius: 6px; background: var(--well); }
+.staking-segment { flex: 1 1 0; min-width: 6px; border-radius: 4px; transition: flex-grow 0.4s ease; }
+.staking-bar--small .staking-segment { min-width: 4px; border-radius: 3px; }
+.staking-segment--available { background: var(--primary); }
+.staking-segment--held { background: var(--ink-300); }
+.staking-segment--unlocking {
+  background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--primary) 78%, transparent) 0 2px, color-mix(in srgb, var(--primary) 26%, transparent) 2px 5px);
+}
+.staking-segment--unknown {
+  background: repeating-linear-gradient(-45deg, var(--ink-300) 0 2px, transparent 2px 5px);
+}
+.staking-segment--pending { background: transparent; border: 1.5px dashed color-mix(in srgb, var(--primary) 70%, transparent); }
+.staking-swatch { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 3px; }
+@media (prefers-reduced-motion: reduce) { .staking-segment { transition: none; } }
+
+.staking-legend { display: flex; flex-wrap: wrap; gap: 14px 30px; margin: 0; }
+.staking-legend dt { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink-500); }
+.staking-legend dd { margin: 3px 0 0 17px; font-size: 15px; font-weight: 600; color: var(--ink-900); font-variant-numeric: tabular-nums; }
+.staking-note-line { display: block; margin-top: 1px; font-size: 12px; font-weight: 400; color: var(--ink-500); }
+
+/* Summary */
+.staking-summary { display: grid; gap: 18px; padding: 24px; border: 1px solid var(--border); border-radius: 18px; background: var(--card); min-width: 0; }
+.staking-placeholder { display: block; width: 180px; height: 42px; border-radius: 10px; background: var(--well); }
+.staking-summary-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+.staking-label { font-size: 13px; font-weight: 500; color: var(--ink-500); }
+.staking-total { margin-top: 6px; }
+.staking-meta { margin-top: 8px; font-size: 12.5px; color: var(--ink-500); }
+.staking-summary-side { display: grid; justify-items: end; gap: 10px; text-align: right; }
+.staking-reward { display: grid; justify-items: end; gap: 1px; }
+.staking-reward-amount { font-size: 17px; font-weight: 600; color: var(--success); font-variant-numeric: tabular-nums; }
+.staking-summary-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.staking-actions { display: flex; gap: 10px; margin-left: auto; flex-wrap: wrap; }
+.staking-note { font-size: 12.5px; line-height: 1.55; color: var(--ink-500); max-width: 68ch; }
+.staking-summary > .staking-details { padding-top: 16px; border-top: 1px solid var(--border); }
+.staking-summary--empty { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.staking-empty-main { display: grid; gap: 12px; justify-items: start; }
+.staking-empty-title { font-size: 20px; font-weight: 600; letter-spacing: -0.015em; color: var(--ink-900); }
+.staking-empty-main p { font-size: 13.5px; line-height: 1.6; max-width: 52ch; }
+.staking-empty-terms { padding-left: 24px; border-left: 1px solid var(--border); }
+@media (max-width: 760px) {
+  .staking-summary--empty { grid-template-columns: 1fr; }
+  .staking-empty-terms { padding: 16px 0 0; border-left: 0; border-top: 1px solid var(--border); }
+}
+
+.staking-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 22px; margin: 0; font-size: 12.5px; line-height: 1.5; }
+.staking-facts dt { color: var(--ink-500); }
+.staking-facts dd { margin: 0; min-width: 0; color: var(--ink-900); font-variant-numeric: tabular-nums; }
+
+/* Attention strip */
+.staking-attention { display: grid; gap: 8px; }
+.staking-attention-item {
+  display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px;
+  background: color-mix(in srgb, var(--danger) 8%, var(--card)); border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border));
+}
+.staking-attention-icon { align-self: start; margin-top: 2px; display: flex; color: var(--danger); }
+.staking-attention-text { display: grid; gap: 2px; min-width: 0; font-size: 12.5px; line-height: 1.5; }
+.staking-attention-title { font-size: 13.5px; font-weight: 600; color: var(--ink-900); }
+.staking-attention-item .staking-op-actions { justify-content: flex-end; }
+@media (max-width: 760px) { .staking-attention-item { grid-template-columns: 18px minmax(0, 1fr); } .staking-attention-item .staking-op-actions { grid-column: 2; justify-content: flex-start; } }
+
+/* Keys */
+.staking-keys { display: grid; gap: 12px; }
+.staking-key-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+.staking-key { display: grid; gap: 12px; align-content: start; padding: 16px 18px; border: 1px solid var(--border); border-radius: 14px; min-width: 0; }
+.staking-key--unused { border-style: dashed; border-color: var(--border-s); }
+.staking-key-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.staking-key-head h3 { font-size: 14px; font-weight: 600; color: var(--ink-900); }
+.staking-key-head p { margin-top: 2px; }
+.staking-key-pills { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.staking-key-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px 16px; margin: 0; }
+.staking-key-facts dt { font-size: 12px; color: var(--ink-500); }
+.staking-key-facts dd { margin: 2px 0 0; font-size: 13.5px; font-weight: 600; color: var(--ink-900); font-variant-numeric: tabular-nums; }
+.staking-key > .staking-details { padding-top: 12px; border-top: 1px solid var(--border); }
+
+.staking-tokens { display: grid; gap: 8px; }
+.staking-token { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 10px; background: var(--well); font-size: 13px; }
+.staking-token strong { font-weight: 600; color: var(--ink-900); }
+
+.staking-details > summary {
+  display: inline-flex; align-items: center; gap: 8px; list-style: none; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: var(--ink-700);
+}
+.staking-details > summary::-webkit-details-marker { display: none; }
+.staking-details > summary::before {
+  content: ''; width: 6px; height: 6px; margin-top: -2px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg); transition: transform 0.15s ease;
+}
+.staking-details[open] > summary::before { transform: rotate(45deg); }
+.staking-details-body { display: grid; gap: 12px; margin-top: 14px; }
+.staking-detail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px 18px; margin: 0; }
+.staking-detail { min-width: 0; }
+.staking-detail--wide { grid-column: 1 / -1; }
+.staking-detail dt { font-size: 12px; color: var(--ink-500); }
+.staking-detail dd { margin: 2px 0 0; font-size: 13px; color: var(--ink-900); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .staking-details > summary::before { transition: none; } }
+
+.staking-how-steps { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; counter-reset: staking-step; }
+.staking-how-steps li {
+  counter-increment: staking-step; display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 12px;
+  font-size: 13px; line-height: 1.55; max-width: 68ch;
+}
+.staking-how-steps li::before {
+  content: counter(staking-step); width: 22px; height: 22px; display: grid; place-items: center;
+  border: 1px solid var(--border-s); border-radius: 50%; font-size: 11.5px; font-weight: 600; color: var(--ink-500);
+}
+.staking-how-steps strong { font-weight: 600; color: var(--ink-900); }
+.staking-help-terms { padding-top: 16px; border-top: 1px solid var(--border); }
+
+/* Activity */
+.staking-activity { display: grid; gap: 10px; min-width: 0; }
+.staking-ops { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+.staking-op { border-bottom: 1px solid var(--border); }
+.staking-op-toggle {
+  width: 100%; display: grid; grid-template-columns: 30px minmax(0, 1fr) auto auto 16px; align-items: center; gap: 12px;
+  padding: 11px 8px 11px 6px; border: 0; background: none; color: inherit; font-family: inherit; text-align: left; cursor: pointer;
+}
+.staking-op-toggle:hover { background: color-mix(in srgb, var(--well) 70%, transparent); }
+.staking-op-icon { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; background: var(--well); color: var(--ink-500); }
+.staking-op[data-tone='danger'] .staking-op-icon { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); }
+.staking-op-main { display: grid; min-width: 0; }
+.staking-op-title { font-size: 13.5px; font-weight: 600; color: var(--ink-900); }
+.staking-op-sub { font-size: 12px; color: var(--ink-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.staking-op-amount { font-size: 13.5px; font-weight: 600; color: var(--ink-900); text-align: right; font-variant-numeric: tabular-nums; }
+.staking-op-chevron { display: flex; color: var(--ink-500); transition: transform 0.15s ease; }
+.staking-op-toggle[aria-expanded='true'] .staking-op-chevron { transform: rotate(180deg); }
+.staking-op-details { display: grid; gap: 12px; padding: 2px 8px 16px 48px; }
+.staking-op-details[hidden] { display: none; }
+.staking-op-message { font-size: 13px; line-height: 1.55; max-width: 64ch; }
+.staking-op-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.staking-ops-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.staking-progress-dot {
+  width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--primary);
+  background: linear-gradient(90deg, var(--primary) 50%, transparent 50%);
+}
+@media (max-width: 760px) {
+  .staking-op-toggle { grid-template-columns: 30px minmax(0, 1fr) auto 16px; }
+  .staking-op-toggle .pill { grid-column: 2 / 4; justify-self: start; }
+  .staking-op-details { padding-left: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { .staking-op-chevron { transition: none; } }
+
+/* Dialog (delegate, unstake, token return, recovery) */
+.staking-dialog {
+  width: 520px; max-width: calc(100vw - 32px); max-height: calc(100dvh - 80px);
+  margin: auto; padding: 0; border: 1px solid var(--border-s); border-radius: 16px;
+  background: var(--card-el); color: var(--ink-700); box-shadow: var(--shadow);
+  overflow: hidden; overscroll-behavior: contain; -webkit-app-region: no-drag;
+}
+.staking-dialog[open] { display: flex; flex-direction: column; }
+.staking-dialog::backdrop { background: rgba(8, 8, 6, 0.5); overflow: hidden; overscroll-behavior: contain; }
+.staking-dialog-title { flex: 1; min-width: 0; }
+.staking-dialog-title h2 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink-900); }
+.staking-dialog-body { display: grid; gap: 18px; padding: 6px 20px 4px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.staking-dialog-foot { flex: none; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 18px 20px; }
+.staking-dialog .modal-close:disabled { opacity: 0.5; cursor: default; }
+/* Keep the button as the click target when blur re-renders its decorative SVG. */
+.staking-dialog .modal-close svg { pointer-events: none; }
+.staking-dialog-form { display: grid; gap: 18px; }
+.staking-fields { border: 0; margin: 0; padding: 0; display: grid; gap: 16px; min-width: 0; }
+.staking-review, .staking-result { display: grid; gap: 14px; outline: none; }
+.staking-review .staking-facts { font-size: 13px; gap: 10px 22px; }
+.staking-result h3 { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink-900); }
+
+.staking-steps { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.staking-steps li { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink-500); }
+.staking-steps li + li::before { content: ''; width: 18px; height: 1px; margin-right: 4px; background: var(--border-s); }
+.staking-steps li > span {
+  width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%;
+  border: 1px solid var(--border-s); font-size: 11px; font-weight: 700;
+}
+.staking-steps li[data-state='current'] { color: var(--ink-900); font-weight: 600; }
+.staking-steps li[data-state='current'] > span { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.staking-steps li[data-state='done'] > span { border-color: var(--primary); color: var(--primary); }
+
+/* In the dark theme the dialog surface equals the default segmented track, so
+   the key switch gets a darker track and a lighter chosen option there. */
+:root:not([data-theme='light']) .staking-dialog .segmented { background: var(--bg); box-shadow: inset 0 0 0 1px var(--border); }
+:root:not([data-theme='light']) .staking-dialog .segmented-btn[data-active='true'] { background: color-mix(in srgb, var(--ink-900) 12%, var(--card-el)); }
+
+/* Send-style amount field: large value, ticker and Max inside. */
+.field-label.staking-amount-label { font-size: 13px; }
+.field-wrap.staking-amount-field { gap: 10px; height: 56px; padding: 0 14px; }
+.field-wrap.staking-amount-field > input { width: 100%; font-size: 26px; font-weight: 600; font-family: var(--display-font); font-variant-numeric: tabular-nums; }
+.staking-amount-asset { flex: none; font-size: 14px; font-weight: 600; color: var(--ink-500); }
+.staking-amount-max {
+  flex: none; min-width: 48px; height: 30px; padding: 0 12px; border-radius: 8px;
+  border: 1px solid var(--border-s); background: transparent; color: var(--primary);
+  font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.staking-amount-max[aria-pressed='true'] { background: var(--primary-soft); }
+.staking-amount-max:disabled { cursor: default; }
+/* Keep actions still when blur switches help text to validation feedback. */
+.staking-amount-hint { display: grid; }
+.staking-amount-hint > span { grid-area: 1 / 1; }
+
+@media (max-width: 700px) {
+  .staking-page { padding: 20px 16px; }
+  .staking-facts { grid-template-columns: 1fr; gap: 4px; }
+  .staking-facts dd { margin-bottom: 8px; }
+}
+@media (max-width: 420px) { .staking-amount--big .staking-amount-number { font-size: 30px; } }

@@ -215,7 +215,7 @@ function SendFromKeyForm({ onClose }: { onClose: () => void }) {
                   </div>
                   <code style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--ink-700)', lineHeight: 1.5, wordBreak: 'break-all' }}>{inspection.addresses[keyAlgo] ?? '—'}</code>
                 </div>
-                {inspection.delegatePubkeyhash && <DelegationNotice delegatePubkeyhash={inspection.delegatePubkeyhash} />}
+                {inspection.delegatePubkeyhash && <DelegationNotice requiresImport delegatePubkeyhash={inspection.delegatePubkeyhash} />}
               </>
             )}
           </>
@@ -223,7 +223,7 @@ function SendFromKeyForm({ onClose }: { onClose: () => void }) {
 
         {step === 'form' && scanned !== null && (
           <>
-            {scanned.delegatePubkeyhash && <DelegationNotice delegatePubkeyhash={scanned.delegatePubkeyhash} />}
+            {scanned.delegatePubkeyhash && <><DelegationNotice requiresImport delegatePubkeyhash={scanned.delegatePubkeyhash} /><p className="field-hint">The balance also includes returned coins on this key’s ordinary address.</p></>}
             <div style={{ background: 'var(--well)', border: '1px solid var(--border)', borderRadius: 12, padding: '11px 13px', display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                 <span style={{ fontSize: 11.5, color: 'var(--ink-500)' }}>Available now</span>
@@ -273,7 +273,7 @@ function SendFromKeyForm({ onClose }: { onClose: () => void }) {
               <ReviewRow label="To" value={preview.recipient} mono />
               <ReviewRow label="Amount" value={`${formatNative(preview.amountAtomic)} ${asset}`} />
               <ReviewRow label="Network fee" value={`${formatNative(preview.feeAtomic)} ${asset}`} />
-              {preview.changeAtomic !== '0' && <ReviewRow label="Change" value={`${formatNative(preview.changeAtomic)} ${asset} — returns to the key's address`} />}
+              {preview.changeAtomic !== '0' && <ReviewRow label="Change" value={`${formatNative(preview.changeAtomic)} ${asset} — returns to the key's ordinary address`} />}
               <ReviewRow label="Signature" value={preview.signature} />
             </div>
             {sendMax && <div style={{ fontSize: 12, color: 'var(--ink-500)', lineHeight: 1.5 }}>All available, mature coins are sent without change. Maturing coins remain at the source address. The key is wiped after sending.</div>}

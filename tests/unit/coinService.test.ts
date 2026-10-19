@@ -49,3 +49,20 @@ describe('CoinService', () => {
     expect((await svc.list())[0]!.confirmations).toBe(0)
   })
 })
+
+it('separates true freezes from reservations and exposes staking coins for explicit unfreeze', async () => {
+  let blob: string | null = null
+  const meta = new CoinMetaStore({ read: async () => blob, write: async (s) => { blob = s } }, { openData: async (s) => s, sealData: async (s) => s })
+  let corrupted = false
+  const svc = new CoinService({ gather: async () => [utxo('aa', 0, 100n), utxo('bb', 0, 200n, { delegated: true })], tipHeight: async () => 1000, meta,
+    reservations: async () => { if (corrupted) throw new Error('Journal unavailable'); return new Map([['aa:0', 'operation']]) } })
+  await svc.setFrozen('bb:0', true)
+  expect(await svc.list()).toMatchObject([{ frozen: false, reservedBy: 'operation' }, { delegated: true, frozen: true }])
+  await svc.setFrozen('bb:0', false)
+  const coins = await svc.list()
+  const { ordinaryCoinAvailable } = await import('../../src/shared/coinAvailability')
+  expect(coins.every((coin) => !ordinaryCoinAvailable(coin))).toBe(true)
+  expect(coins[1]!.frozen).toBe(false)
+  corrupted = true
+  expect((await svc.list()).every((coin) => coin.availabilityUnknown)).toBe(true)
+})

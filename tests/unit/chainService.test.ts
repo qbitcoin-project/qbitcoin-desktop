@@ -56,6 +56,71 @@ function withTokens(address: string, tokens: Record<string, bigint>): AddressInf
 }
 
 describe('ChainService', () => {
+  it('keeps transaction details readable when the staking journal fails without marking unknown ownership as external', async () => {
+    const tx: ChainTx = { txid: 'receive', version: 1, size: 200, fee: 1n, status: { confirmed: true, blockHeight: 999 },
+      vin: [{ txid: 'source', vout: 0, prevoutValue: 100n, prevoutAddress: 'external' }],
+      vout: [{ value: 40n, scripthash: 'ordinary', address: 'addr-0-0' }, { value: 59n, scripthash: 'covenant', address: 'delegated' }] }
+    let failed = true
+    const svc = new ChainService(backend({ infos: { 'addr-0-0': fundedInfo('addr-0-0', 40n), delegated: fundedInfo('delegated', 59n) }, tx: { receive: tx } }), branches,
+      { delegatedAddresses: async () => {
+        if (failed) throw new Error('Staking data could not be restored')
+        return [{ address: 'delegated', algo: 'falcon512' }]
+      } })
+    const detail = await svc.getTxDetail('receive')
+    expect(detail).toMatchObject({ confirmations: 2, sizeBytes: 200, totalInAtomic: '100', totalOutAtomic: '99', feeAtomic: '1', ownershipIncomplete: true })
+    expect(detail.outputs[0]).toMatchObject({ own: true })
+    expect(detail.outputs[0]!.ownershipUnknown).toBeUndefined()
+    expect(detail.outputs[1]).toMatchObject({ own: false, ownershipUnknown: true })
+    expect(detail.inputs[0]).toMatchObject({ ownershipUnknown: true })
+    // Partial reads are explicit; spending still fails closed.
+    expect(await svc.getSummary()).toMatchObject({ balanceAtomic: '40', readWarning: expect.stringContaining('incomplete') })
+    expect((await svc.inventoryAddresses()).every((a) => a.availabilityUnknown)).toBe(true)
+    await expect(svc.spendableAddresses()).rejects.toThrow(/Staking data/)
+    failed = false
+    const recovered = await svc.getTxDetail('receive')
+    expect(recovered.ownershipIncomplete).toBeUndefined()
+    expect(recovered.outputs[1]).toMatchObject({ own: true, pq: true })
+    expect(recovered.outputs[1]!.ownershipUnknown).toBeUndefined()
+  })
+
+  it('includes fixed delegations in total and ownership, excluding them from ordinary selection', async () => {
+    const send: ChainTx = { txid: 'internal', version: 1, size: 200, fee: 1n, status: { confirmed: false },
+      vin: [{ txid: 'source', vout: 0, prevoutValue: 100n, prevoutAddress: 'addr-0-0' }],
+      vout: [{ value: 40n, scripthash: 'ordinary', address: 'addr-0-0' }, { value: 59n, scripthash: 'covenant', address: 'delegated' }] }
+    const ordinary = fundedInfo('addr-0-0', 100n)
+    const pendingOrdinary = { ...ordinary, mempool: { fundedTxCount: 1, fundedSum: 40n, spentTxCount: 1, spentSum: 100n } }
+    const pendingDelegation = { ...emptyInfo('delegated'), mempool: { ...ZERO, fundedTxCount: 1, fundedSum: 59n } }
+    const svc = new ChainService(backend({ infos: { 'addr-0-0': pendingOrdinary, delegated: pendingDelegation },
+      txs: { 'addr-0-0': [send], delegated: [send] }, tx: { internal: send } }), branches,
+    { delegatedAddresses: async () => [{ address: 'delegated', algo: 'falcon512' }] })
+    expect(await svc.getSummary()).toMatchObject({ balanceAtomic: '99', delegatedAtomic: '59', ordinaryAtomic: '40' })
+    expect((await svc.spendableAddresses()).map((a) => a.address)).toEqual(['addr-0-0'])
+    expect((await svc.getHistory()).items).toHaveLength(1)
+    const detail = await svc.getTxDetail('internal')
+    expect(detail.outputs.every((o) => o.own)).toBe(true)
+    expect(detail.outputs[1]!.pq).toBe(true)
+  })
+
+  it('finds delegation funds with an unused ordinary account and does not double-count an imported delegated address', async () => {
+    const reader = backend({ infos: { delegated: fundedInfo('delegated', 100n) } })
+    const options = { delegatedAddresses: async () => [{ address: 'delegated', algo: 'ecdsa' as const }] }
+    const hd = new ChainService(reader, branches, options)
+    expect(await hd.getSummary()).toMatchObject({ balanceAtomic: '100', delegatedAtomic: '100', ordinaryAtomic: '0' })
+    expect(await hd.spendableAddresses()).toEqual([])
+    const imported = new ChainService(reader, async () => [{ kind: 'list', algo: 'ecdsa', addresses: [{ chain: 0, index: 0, address: 'delegated' }] }], options)
+    expect(await imported.getSummary()).toMatchObject({ balanceAtomic: '100', delegatedAtomic: '100', addressCount: 1 })
+    expect(await imported.spendableAddresses()).toEqual([])
+  })
+
+  it('omits the ordinary and delegated split when the wallet has no staking addresses', async () => {
+    const svc = new ChainService(backend({ infos: { 'addr-0-0': fundedInfo('addr-0-0', 100n) } }), branches,
+      { delegatedAddresses: async () => [] })
+    const summary = await svc.getSummary()
+    expect(summary).toMatchObject({ balanceAtomic: '100' })
+    expect(summary).not.toHaveProperty('delegatedAtomic')
+    expect(summary).not.toHaveProperty('ordinaryAtomic')
+  })
+
   it('sums balance across discovered addresses', async () => {
     const svc = new ChainService(
       backend({ infos: { 'addr-0-0': fundedInfo('addr-0-0', 150n), 'addr-0-1': fundedInfo('addr-0-1', 50n) } }),

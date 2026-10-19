@@ -1,4 +1,4 @@
-import { encodeBase58Check, hash160, hash256, opPushdata, type Algorithm, type Network, type TxInput } from '@qbtc/crypto'
+import { decodeBase58Check, encodeBase58Check, hash160, hash256, opPushdata, type Algorithm, type Network, type TxInput } from '@qbtc/crypto'
 import { addressFromScripthash } from '../brand/crypto'
 import { DELEGATION } from '../brand/delegation'
 
@@ -44,4 +44,21 @@ export function delegationAddress(owner: Uint8Array, delegate: Uint8Array, netwo
 export function encodeDelegatePubkeyhash(hash: Uint8Array, network: Network): string {
   hashOp(hash)
   return encodeBase58Check(DELEGATION[network].pubkeyhashMagic, hash)
+}
+
+export function decodeDelegatePubkeyhash(encoded: string, network: Network): Uint8Array {
+  const { version, payload } = decodeBase58Check(encoded, 2)
+  const magic = DELEGATION[network].pubkeyhashMagic
+  if (version.length !== magic.length || version.some((v, i) => v !== magic[i])) throw new Error('Wrong delegation network.')
+  hashOp(payload)
+  return payload
+}
+
+export function delegationMark(ownerHash: Uint8Array): Uint8Array {
+  hashOp(ownerHash)
+  return concat(Uint8Array.of(0x44), ownerHash)
+}
+
+export function parseDelegationMark(data: Uint8Array): Uint8Array | null {
+  return (data.length === 21 || data.length === 33) && data[0] === 0x44 ? data.slice(1) : null
 }

@@ -1,3 +1,4 @@
+import { ordinaryCoinAvailable } from '../../shared/coinAvailability'
 import { useEffect, useId, useState, type CSSProperties, type ReactNode } from 'react'
 import type { SendPreview, TokenBalance, TokenSendPreview } from '../../shared/protocol'
 import { isMature } from '../../shared/maturity'
@@ -7,7 +8,7 @@ import { wallet } from '../lib/wallet'
 import { validateAmount } from '../lib/amountValidation'
 import { DelegationNotice } from '../components/DelegationNotice'
 import { coinSelectionShort, isInsufficientFundsError } from '../lib/sendValidation'
-import { invalidate, setContacts as cacheSetContacts, useActiveWallet, useAddressPlaceholder, useAssetLabel, useCoins, useContacts, useTokens } from '../lib/walletData'
+import { invalidate, setContacts as cacheSetContacts, useActiveWallet, useAddressPlaceholder, useAssetLabel, useCoins, useContacts, useTokens, useSummary } from '../lib/walletData'
 import { Alert, AlertIcon, Button, CheckIcon, ChevDownIcon, ChevRightIcon, CoinsIcon, ContactDialog, ContactIcon, CopyIcon, EyeIcon, Pill, PlusIcon, Screen, TextField } from '../ui'
 
 // Send flow: form → review (built + held in main) → sending (sign + broadcast) →
@@ -15,7 +16,7 @@ import { Alert, AlertIcon, Button, CheckIcon, ChevDownIcon, ChevRightIcon, Coins
 // shows the preview. Amounts go to main as atomic strings (integer math).
 type Stage = 'form' | 'building' | 'review' | 'sending' | 'done' | 'failed'
 
-export function Send({ onDone, preselected = [], token = null }: { onDone: () => void; preselected?: readonly string[]; token?: TokenBalance | null }) {
+export function Send({ onDone, onUnstake, preselected = [], token = null }: { onDone: () => void; onUnstake?: () => void; preselected?: readonly string[]; token?: TokenBalance | null }) {
   const [stage, setStage] = useState<Stage>('form')
   const [recipient, setRecipient] = useState('')
   const [amount, setAmount] = useState('')
@@ -49,6 +50,7 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
   const { data: coinsData } = useCoins()
   const { data: tokensData } = useTokens()
   const activeWallet = useActiveWallet()
+  const { data: summary } = useSummary()
   const contacts = contactsData ?? []
   const tokens = tokensData ?? []
   // Per-network brand strings: the native ticker and the address hint.
@@ -57,15 +59,18 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
 
   const assetSym = asset !== null ? tokenLabels(asset).ticker : nativeLabel
   const decimals = asset !== null ? asset.decimals : 8
-  const nativeAvailable = coinsData !== undefined ? coinsData.filter((c) => !c.frozen && c.tokenId === undefined && isMature(c)).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n).toString() : null
-  const tokenAvailable = asset !== null && coinsData !== undefined ? coinsData.filter((c) => c.tokenId === asset.id && !c.frozen && isMature(c)).reduce((sum, c) => sum + BigInt(c.tokenAmountAtomic ?? '0'), 0n) : null
+  const nativeAvailable = coinsData !== undefined ? coinsData.filter((c) => ordinaryCoinAvailable(c) && c.tokenId === undefined && isMature(c)).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n).toString() : null
+  const tokenAvailable = asset !== null && coinsData !== undefined ? coinsData.filter((c) => c.tokenId === asset.id && ordinaryCoinAvailable(c) && isMature(c)).reduce((sum, c) => sum + BigInt(c.tokenAmountAtomic ?? '0'), 0n) : null
   const availableLabel = asset !== null ? tokenAvailable !== null ? `${formatToken(tokenAvailable.toString(), decimals)} ${assetSym}` : null : nativeAvailable !== null ? `${formatNative(nativeAvailable)} ${nativeLabel}` : null
-  const manualAvailable = asset === null && selectedCoins.size > 0 ? (coinsData ?? []).filter((c) => selectedCoins.has(c.outpoint) && !c.frozen && !c.maturityUnknown && c.tokenId === undefined).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n) : null
+  const manualAvailable = asset === null && selectedCoins.size > 0 ? (coinsData ?? []).filter((c) => selectedCoins.has(c.outpoint) && ordinaryCoinAvailable(c) && !c.maturityUnknown && c.tokenId === undefined).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n) : null
   const amountCheck = validateAmount(amount, { decimals, available: asset !== null ? tokenAvailable : manualAvailable ?? (nativeAvailable !== null ? BigInt(nativeAvailable) : null) })
-  const assetCoins = (coinsData ?? []).filter((c) => !c.frozen && c.tokenId === (asset?.id ?? undefined))
+  const assetCoins = (coinsData ?? []).filter((c) => ordinaryCoinAvailable(c) && c.tokenId === (asset?.id ?? undefined))
   const maturing = assetCoins.filter((c) => !c.maturityUnknown && !isMature(c))
   const maturingAmount = maturing.reduce((s, c) => s + BigInt(asset === null ? c.valueAtomic : c.tokenAmountAtomic ?? '0'), 0n)
   const nextMaturesAt = maturing.length > 0 ? Math.min(...maturing.map((c) => c.maturesAt!)) : undefined
+  const hasStakingBalance = BigInt(summary?.delegatedAtomic ?? '0') > 0n
+  const needsUnstake = onUnstake !== undefined && hasStakingBalance && (feeShort || feeBlocked || nativeAvailable === '0' ||
+    (asset === null && amountCheck.atomic !== null && nativeAvailable !== null && amountCheck.atomic > BigInt(nativeAvailable)))
   const amountInvalid = amountCheck.atomic === null || amountCheck.error !== null
   const showAmountError = amountLeft && amountCheck.error !== null
 
@@ -86,7 +91,7 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
 
   // Coin-control derivations (native-coin sends only). `outpoints` drives the build:
   // a manual selection spends exactly those; an empty one lets main auto-select.
-  const spendableCoins = (coinsData ?? []).filter((c) => c.tokenId === undefined && !c.frozen && !c.maturityUnknown)
+  const spendableCoins = (coinsData ?? []).filter((c) => c.tokenId === undefined && ordinaryCoinAvailable(c) && !c.maturityUnknown)
   const outpoints = selectedCoins.size > 0 ? [...selectedCoins] : undefined
   const coinKey = outpoints?.join(',') ?? ''
   const pickedAtomic = spendableCoins.filter((c) => selectedCoins.has(c.outpoint)).reduce((sum, c) => sum + BigInt(c.valueAtomic), 0n)
@@ -452,7 +457,9 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
                   {maxLoading ? <span className="spinner spinner--xs" aria-label="Calculating" /> : 'Max'}
                 </button>
               </div>
-              {showAmountError && <div id={amountHintId} role="alert" className="field-hint field-hint--error">{amountCheck.error}</div>}
+              {/* Reserve the error's space while editing so blur cannot move an action between pointer down and click. */}
+              {amountCheck.error !== null && <div id={amountHintId} role={showAmountError ? 'alert' : undefined}
+                style={{ visibility: showAmountError ? 'visible' : 'hidden' }} className="field-hint field-hint--error">{amountCheck.error}</div>}
               {assetMenuOpen && (
                 <div style={{ position: 'absolute', top: 90, right: 0, zIndex: 20, width: 168, background: 'var(--card-el)', border: '1px solid var(--border-s)', borderRadius: 11, boxShadow: 'var(--shadow)', overflow: 'hidden', padding: 4 }}>
                   {[null, ...tokens].map((a) => {
@@ -511,6 +518,11 @@ export function Send({ onDone, preselected = [], token = null }: { onDone: () =>
                 </div>
               </Alert>
             )}
+
+            {needsUnstake && <Alert variant="caution"><div>
+              Send uses ordinary coins only. Unstake the amount you need and wait for confirmation, then return to Send.
+              <Button variant="ghost" size="sm" onClick={onUnstake}>Go to Staking</Button>
+            </div></Alert>}
 
             {/* Coin control — collapsed by default (automatic). Native sends only; a
                token send picks its own UTXOs. Manual selection feeds `outpoints`. */}

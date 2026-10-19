@@ -34,7 +34,7 @@ const PLACEHOLDER: Record<Kind, string> = {
 }
 
 const HELP: Record<Kind, string> = {
-  descriptor: 'Follows both the classical and the Falcon (post-quantum) branches.',
+  descriptor: 'Follows ordinary classical and Falcon branches. Fixed HD staking addresses are not included.',
   xpub: 'An account-level xpub — follows the classical branch only.',
   addresses: 'Watches exactly the addresses you paste, one per line.',
 }

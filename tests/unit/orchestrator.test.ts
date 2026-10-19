@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { VaultOrchestrator, type AddressOps, type ChainOps, type CoinOps, type ContactOps, type MnemonicTools, type NodeOps, type SendOps, type SweepOps, type DowngradeOps,
-  type UpgradeOps, type VaultLike, type WalletOps } from '../../src/main/vault/orchestrator'
+  type UpgradeOps, type VaultLike, type WalletOps, type StakingOps } from '../../src/main/vault/orchestrator'
 import type { NodeSettings, VaultStatus } from '../../src/shared/protocol'
 
 const SEED = 'SEED-MUST-NEVER-CROSS-THE-BRIDGE'
@@ -170,15 +170,43 @@ const UPGRADE_OPS: UpgradeOps = {
   },
 }
 
-function make() {
+function make(staking?: StakingOps) {
   const vault = new FakeVault()
   return {
     vault,
-    orch: new VaultOrchestrator({ vault, mnemonic: TOOLS, addresses: ADDRESSES, chain: CHAIN, send: SEND, coins: COINS, contacts: CONTACTS, wallets: WALLETS, sweep: SWEEP, node: NODE, upgrade: UPGRADE_OPS, downgrade: DOWNGRADE_OPS }),
+    orch: new VaultOrchestrator({ vault, mnemonic: TOOLS, addresses: ADDRESSES, chain: CHAIN, send: SEND, coins: COINS, contacts: CONTACTS, wallets: WALLETS, sweep: SWEEP, node: NODE, upgrade: UPGRADE_OPS, downgrade: DOWNGRADE_OPS, staking }),
   }
 }
 
 describe('VaultOrchestrator', () => {
+  it('gates every staking route on unlock and validates public request fields before calling the service', async () => {
+    const called: string[] = []
+    const never = async (): Promise<never> => { throw new Error('Unexpected request') }
+    const staking: StakingOps = { info: async () => { called.push('info'); return { enabled: false, fundingEnabled: false, minimumVerified: false, network: 'testnet', algorithms: [] } },
+      list: async () => { called.push('list'); return { addresses: [], operations: [] } }, refresh: never, buildFunding: never, buildWithdrawal: never,
+      confirm: async (id) => { called.push(id); return { operationId: id, state: 'pending' } }, retry: never, buildRecovery: never, setAutoRetry: never }
+    const { orch, vault } = make(staking)
+    for (const type of ['staking.info', 'staking.list', 'staking.refresh', 'staking.buildFunding', 'staking.buildWithdrawal', 'staking.confirm', 'staking.retry', 'staking.buildRecovery', 'staking.setAutoRetry'] as const) {
+      const result = await orch.handle({ type } as Parameters<typeof orch.handle>[0])
+      expect(result).toMatchObject({ ok: false, error: { message: 'Unlock the wallet to use staking.' } })
+    }
+    expect(called).toEqual([])
+    vault.status = 'unlocked'
+    expect((await orch.handle({ type: 'staking.info' })).ok).toBe(true)
+    expect((await orch.handle({ type: 'staking.list' })).ok).toBe(true)
+    expect((await orch.handle({ type: 'staking.confirm', draftId: 'exact-reviewed-id' })).ok).toBe(true)
+    expect(called).toEqual(['info', 'list', 'exact-reviewed-id'])
+    const invalid = await orch.handle({ type: 'staking.buildFunding', request: { algo: 'schnorr', amountAtomic: '1' } } as unknown as Parameters<typeof orch.handle>[0])
+    expect(invalid).toMatchObject({ ok: false, error: { message: 'Invalid staking request.' } })
+    for (const request of [null, {}, { address: 'a', amountAtomic: 1 }, { address: 'a', amountAtomic: '1', max: 'yes' }, { address: 'a', amountAtomic: '0', tokenId: 'invalid' }]) {
+      expect(await orch.handle({ type: 'staking.buildWithdrawal', request } as unknown as Parameters<typeof orch.handle>[0])).toMatchObject({ ok: false, error: { message: 'Invalid unstake request.' } })
+    }
+    expect(await orch.handle({ type: 'staking.setAutoRetry', operationId: 'id', enabled: 'yes' } as unknown as Parameters<typeof orch.handle>[0])).toMatchObject({ ok: false, error: { message: 'Invalid retry setting.' } })
+    const withdrawal = { address: 'exact-staking-address', amountAtomic: '1000', max: false }
+    staking.buildWithdrawal = async (request) => { expect(request).toEqual(withdrawal); throw new Error('Valid unstake reached service') }
+    expect(await orch.handle({ type: 'staking.buildWithdrawal', request: withdrawal })).toMatchObject({ ok: false, error: { message: 'Valid unstake reached service' } })
+  })
+
   it('reports the vault status', async () => {
     const { orch } = make()
     expect(await orch.handle({ type: 'vault.getStatus' })).toEqual({ ok: true, value: 'empty' })

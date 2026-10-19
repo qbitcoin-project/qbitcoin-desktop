@@ -835,6 +835,10 @@ textarea.field {
   color: var(--success);
   background: color-mix(in srgb, var(--success) 15%, transparent);
 }
+.pill[data-tone='danger'] {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+}
 .pill[data-tone='neutral'] {
   color: var(--ink-500);
   background: var(--well);

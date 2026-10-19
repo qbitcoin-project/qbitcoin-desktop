@@ -1,6 +1,5 @@
-// Icon set ported 1:1 from the design's icon definitions so glyphs match exactly:
-// viewBox 0 0 24 24, 1.8 stroke, round caps/joins, currentColor. Each entry is the
-// raw inner SVG markup (paths/rects/circles/ellipses) copied verbatim; filled marks
+// Icons follow the design's geometry: viewBox 0 0 24 24, 1.8 stroke, round
+// caps/joins, currentColor. Each entry is raw inner SVG markup; filled marks
 // set fill/stroke explicitly. Icons are decorative — the surrounding control owns
 // the accessible name — so every svg is aria-hidden.
 const ICONS = {
@@ -10,6 +9,7 @@ const ICONS = {
   activity: '<path d="M3 12h4l2.5 6 4-14 2.5 8H21"/>',
   settings: '<path d="M4 7h9"/><circle cx="16" cy="7" r="2.4"/><path d="M18.5 7H21"/><path d="M4 17h4"/><circle cx="11" cy="17" r="2.4"/><path d="M13.5 17H21"/>',
   coins: '<ellipse cx="12" cy="6.5" rx="7" ry="3"/><path d="M5 6.5v5c0 1.66 3.13 3 7 3s7-1.34 7-3v-5"/><path d="M5 11.5v5c0 1.66 3.13 3 7 3s7-1.34 7-3v-5"/>',
+  staking: '<circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M12 7.5V11M5 15.5V13a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2.5"/>',
   lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   atom: '<circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><ellipse cx="12" cy="12" rx="9" ry="3.7"/><ellipse cx="12" cy="12" rx="9" ry="3.7" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="9" ry="3.7" transform="rotate(120 12 12)"/>',
   refresh: '<path d="M20 11a8 8 0 1 0 -.7 4"/><path d="M20 5v6h-6"/>',
@@ -38,6 +38,7 @@ const ICONS = {
   alert: '<path d="M12 3.5l9 15.5H3l9-15.5z"/><path d="M12 10v4.5"/><circle cx="12" cy="17" r="0.7" fill="currentColor" stroke="none"/>',
   key: '<circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3"/><path d="M18 5l2 2"/><path d="M15 8l2 2"/>',
   trash: '<path d="M5 7h14M10 7V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"/><path d="M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.75" r="1" fill="currentColor" stroke="none"/>',
 } satisfies Record<string, string>
 
 export type IconName = keyof typeof ICONS
@@ -74,6 +75,7 @@ export const ReceiveIcon = make('receive')
 export const ActivityIcon = make('activity')
 export const SettingsIcon = make('settings')
 export const CoinsIcon = make('coins')
+export const StakingIcon = make('staking')
 export const LockIcon = make('lock')
 export const AtomIcon = make('atom')
 export const RefreshIcon = make('refresh')
@@ -102,3 +104,4 @@ export const ContactIcon = make('contact')
 export const AlertIcon = make('alert')
 export const KeyIcon = make('key')
 export const TrashIcon = make('trash')
+export const InfoIcon = make('info')

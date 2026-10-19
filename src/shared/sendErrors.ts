@@ -6,5 +6,5 @@ export class SendUncertainError extends Error {
   override readonly name = 'SendUncertainError'
 }
 export function sendRecovery(error: unknown): 'review' | 'retry' {
-  return error instanceof Error && error.name === 'SendNeedsReviewError' ? 'review' : 'retry'
+  return error instanceof Error && error.name === 'SendUncertainError' ? 'retry' : 'review'
 }

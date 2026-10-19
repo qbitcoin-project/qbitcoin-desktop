@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-export type PillTone = 'pq' | 'frozen' | 'watch' | 'warning' | 'success' | 'neutral'
+export type PillTone = 'pq' | 'frozen' | 'watch' | 'warning' | 'success' | 'danger' | 'neutral'
 
 // Small status chip. `tone` selects the token pair (see .pill in app.css).
 export function Pill({ tone = 'neutral', icon, children }: { tone?: PillTone; icon?: ReactNode; children: ReactNode }) {

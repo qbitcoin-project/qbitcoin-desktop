@@ -16,6 +16,16 @@ import type { AddressAlgo, FeeBands, HistoryItem, HistoryPage, TokenBalance, TxD
 interface AddressTag {
   readonly algo: Algo
   readonly scheme?: string
+  readonly delegated?: boolean
+  readonly excludeFromSpend?: boolean
+}
+
+/** Reads may show explicitly incomplete ordinary data when staking recovery
+ * fails. Spending discovery still fails closed to protect unknown reservations. */
+class DelegationIndexError extends Error {
+  constructor(readonly known: Map<string, AddressTag>, readonly found: DiscoveredAddress[], cause: unknown) {
+    super(cause instanceof Error ? cause.message : 'Staking addresses could not be loaded.', { cause })
+  }
 }
 
 // The chain backend the service needs. The real ChainClient satisfies it; tests
@@ -41,22 +51,30 @@ export class ChainService {
     // Which source-chain network a downgrade payout script encodes to (the
     // native network maps 1:1 to the BTC side). Optional: without it the
     // detail view shows the raw scriptPubKey instead of an address.
-    private readonly opts: { readonly btcNetwork?: BtcNetwork } = {},
+    private readonly opts: { readonly btcNetwork?: BtcNetwork;
+      readonly delegatedAddresses?: () => Promise<readonly { address: string; algo: Algo }[]> } = {},
   ) {}
 
   async getSummary(): Promise<WalletSummary> {
-    const [discovered, info] = await Promise.all([this.discover(), this.backend.getBlockchainInfo()])
+    const [read, info] = await Promise.all([this.readDiscover(), this.backend.getBlockchainInfo()])
+    const discovered = read.found
     let total = 0n
+    let delegated = 0n
     for (const d of discovered) total += balanceOf(d.info)
+    for (const d of discovered) if (read.map.get(d.address)?.delegated) delegated += balanceOf(d.info)
     return {
+      ...(read.warning === undefined ? {} : { readWarning: read.warning }),
       balanceAtomic: total.toString(),
       tipHeight: info.tipHeight,
       addressCount: discovered.length,
+      // The split only means something when the wallet has staking addresses.
+      ...([...read.map.values()].some((tag) => tag.delegated) ? { delegatedAtomic: delegated.toString(), ordinaryAtomic: (total - delegated).toString() } : {}),
     }
   }
 
   async getHistory(pages = 1): Promise<HistoryPage> {
-    const discovered = await this.discover()
+    const read = await this.readDiscover()
+    const discovered = read.found
     const ours = new Set(discovered.map((d) => d.address))
     const active = discovered.filter((x) => isActive(x.info))
 
@@ -106,14 +124,19 @@ export class ChainService {
 
     // Newest first; unconfirmed (no height) on top.
     items.sort((a, b) => (b.blockHeight ?? Number.MAX_SAFE_INTEGER) - (a.blockHeight ?? Number.MAX_SAFE_INTEGER))
-    return { items, hasMore }
+    return { items, hasMore, ...(read.warning === undefined ? {} : { readWarning: read.warning }) }
   }
 
   // Full detail for one transaction: confirmations, size, totals and the resolved
   // input/output lists with our addresses (and post-quantum ones) marked. Fetched
   // on demand when the detail drawer opens.
   async getTxDetail(txid: string): Promise<TxDetail> {
-    const [tx, tip, byAlgo] = await Promise.all([this.backend.getTransaction(txid), this.tipHeight(), this.discoverByAlgo()])
+    const [tx, tip, ownership] = await Promise.all([this.backend.getTransaction(txid), this.tipHeight(),
+      this.discoverByAlgo().then((map) => ({ map, incomplete: false })).catch((error: unknown) => {
+        if (!(error instanceof DelegationIndexError)) throw error
+        return { map: error.known, incomplete: true }
+      })])
+    const byAlgo = ownership.map
     const confirmations = tx.status.confirmed && tx.status.blockHeight !== undefined ? Math.max(0, tip - tx.status.blockHeight + 1) : 0
     const entry = (address: string | undefined, value: bigint, tokenId?: string, tokenAmount?: bigint): MutableIoEntry => {
       const tag = address !== undefined ? byAlgo.get(address) : undefined
@@ -121,6 +144,7 @@ export class ChainService {
         amountAtomic: value.toString(),
         own: tag !== undefined,
         pq: tag?.algo === 'falcon512',
+        ...(ownership.incomplete && tag === undefined ? { ownershipUnknown: true } : {}),
       }
       if (address !== undefined) e.address = address
       if (tokenId !== undefined) {
@@ -159,6 +183,7 @@ export class ChainService {
       inputs,
       outputs,
       txType: tx.version,
+      ...(ownership.incomplete ? { ownershipIncomplete: true } : {}),
     }
     if (tx.status.blockHash !== undefined) detail.blockHash = tx.status.blockHash
     if (tx.status.blockHeight !== undefined) detail.blockHeight = tx.status.blockHeight
@@ -217,7 +242,7 @@ export class ChainService {
   // Tokens the wallet holds: sum each token's balance across the discovered
   // addresses (the node reports a per-address token map), then attach metadata.
   async listTokens(): Promise<TokenBalance[]> {
-    const discovered = await this.discover()
+    const discovered = (await this.readDiscover()).found
     const sums = new Map<string, bigint>()
     for (const d of discovered) {
       for (const [id, amount] of Object.entries(d.info.tokens)) {
@@ -312,12 +337,31 @@ export class ChainService {
     const discovered = await this.discover()
     const byAlgo = this.algoMemo?.map
     return discovered
-      .filter((d) => isActive(d.info))
+      .filter((d) => isActive(d.info) && byAlgo?.get(d.address)?.excludeFromSpend !== true)
       .map((d) => {
         const tag = byAlgo?.get(d.address)
         const base: ActiveAddress = { address: d.address, chain: d.chain, index: d.index, algo: tag?.algo ?? 'ecdsa' }
         return tag?.scheme !== undefined ? { ...base, scheme: tag.scheme } : base
       })
+  }
+
+  /** Viewing and unfreezing coins does not authorize spending them. */
+  async inventoryAddresses(): Promise<(ActiveAddress & { delegated?: boolean; availabilityUnknown?: boolean })[]> {
+    const read = await this.readDiscover()
+    return read.found.filter((d) => isActive(d.info)).map((d) => ({
+      address: d.address, chain: d.chain, index: d.index, algo: read.map.get(d.address)?.algo ?? 'ecdsa',
+      scheme: read.map.get(d.address)?.scheme, delegated: read.map.get(d.address)?.delegated,
+      ...(read.warning === undefined ? {} : { availabilityUnknown: true }),
+    }))
+  }
+
+  private async readDiscover(): Promise<{ found: DiscoveredAddress[]; map: Map<string, AddressTag>; warning?: string }> {
+    try { const found = await this.discover(); return { found, map: this.algoMemo!.map } }
+    catch (error) {
+      if (!(error instanceof DelegationIndexError)) throw error
+      return { found: error.found, map: error.known,
+        warning: 'Staking data could not be restored. The balances and history shown may be incomplete. Spending is disabled until the saved journal is restored. Keep the wallet files; do not delete the journal.' }
+    }
   }
 
   // Tip height, cached briefly. Blocks are ~10s apart, so a few seconds of staleness
@@ -364,8 +408,20 @@ export class ChainService {
       for (const d of found) map.set(d.address, scheme !== undefined ? { algo, scheme } : { algo })
       all.push(...found)
     }
+    let extras: readonly { address: string; algo: Algo }[]
+    try { extras = await this.opts.delegatedAddresses?.() ?? [] }
+    catch (error) { throw new DelegationIndexError(map, all, error) }
+    for (const extra of extras) {
+      const existing = map.get(extra.address)
+      if (existing !== undefined) map.set(extra.address, { ...existing, delegated: true, excludeFromSpend: true })
+      else {
+        const info = await this.backend.getAddressInfo(extra.address)
+        all.push({ address: extra.address, chain: 0, index: 0, info })
+        map.set(extra.address, { algo: extra.algo, delegated: true, excludeFromSpend: true })
+      }
+    }
     this.algoMemo = { at: Date.now(), map }
-    return all
+    return [...new Map(all.map((d) => [d.address, d])).values()]
   }
 }
 

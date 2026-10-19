@@ -5,6 +5,9 @@ import type { SignedTx } from './signTx'
 import { ChainError } from '@qbtc/chain'
 import { isMature } from '../../shared/maturity'
 import { SendNeedsReviewError, SendUncertainError } from '../../shared/sendErrors'
+import { assertBroadcastSize } from './transactionLimits'
+import { draftSizeUpperBound } from './buildTx'
+import { buildWithChange } from './buildWithChange'
 
 // Dependencies, injected so the service is testable without crypto or network.
 export interface SendDeps {
@@ -13,6 +16,7 @@ export interface SendDeps {
   feeRate(): Promise<number>
   /** Outpoints (`txid:vout`) the user froze — excluded from automatic selection. */
   frozen(): Promise<ReadonlySet<string>>
+  reserved?(): Promise<ReadonlySet<string>>
   /** A fresh classical (ECDSA) change address. */
   getChangeAddress(): Promise<string>
   /** A fresh post-quantum (Falcon) change address. */
@@ -28,6 +32,8 @@ export interface SendDeps {
   onBroadcastFailure?(): void
   /** True only when the exact locally signed transaction is known by the node. */
   isKnownTransaction?(txid: string): Promise<boolean>
+  /** Recheck shared reservations before the first signature of this draft. */
+  assertInputs?(unsigned: UnsignedTx): Promise<void>
 }
 
 const outpointOf = (u: SpendableUtxo): string => `${u.txid}:${String(u.vout)}`
@@ -58,21 +64,12 @@ export class SendService {
     // and auto and manual agree on the same coin set. Throws InsufficientFunds
     // here (before building) when even a changeless send can't be funded.
 
-    // Pre-derive both change addresses; buildSend picks one by the inputs' majority
-    // algorithm so a PQ-funded send keeps its change post-quantum.
-    const [classicalChange, pqChange] = await Promise.all([this.deps.getChangeAddress(), this.deps.getPqChangeAddress()])
-    const changeAddressFor = (algo: ChangeBranch): string => (algo === 'falcon512' ? pqChange : classicalChange)
-    const feeAtomic = estimateSendFee({ utxos, manualInputs, amountAtomic, feeRatePerVByte: rate, sendMax, recipient, changeAddressFor })
-    const built = buildSend({
-      utxos,
-      manualInputs,
-      recipient,
-      amountAtomic,
-      feeAtomic,
-      sendMax,
-      changeAddressFor,
-    })
+    const { built } = await buildWithChange(recipient, (changeAddressFor) => {
+      const feeAtomic = estimateSendFee({ utxos, manualInputs, amountAtomic, feeRatePerVByte: rate, sendMax, recipient, changeAddressFor })
+      return buildSend({ utxos, manualInputs, recipient, amountAtomic, feeAtomic, sendMax, changeAddressFor })
+    }, (algo) => algo === 'falcon512' ? this.deps.getPqChangeAddress() : this.deps.getChangeAddress())
     this.checkBuild(generation)
+    assertBroadcastSize(draftSizeUpperBound(manualInputs ?? utxos, built.unsigned))
     this.pending = {
       unsigned: built.unsigned,
       advance: built.changeAtomic > 0n && built.changeAlgo !== undefined ? [built.changeAlgo] : [],
@@ -99,10 +96,16 @@ export class SendService {
   private async resolveInputs(outpoints?: readonly string[]): Promise<{ utxos: readonly GatheredUtxo[]; manualInputs?: readonly GatheredUtxo[] }> {
     // Native sends spend native UTXOs only — token UTXOs (value 0) are filtered out;
     // the token-send path selects those by token id instead.
-    const all = (await this.deps.gather()).filter((u) => u.tokenId === undefined)
+    const gathered = await this.deps.gather()
+    if (outpoints?.some((o) => gathered.some((u) => outpointOf(u) === o && u.keyScript === 'delegated'))) {
+      throw new Error('Send uses ordinary coins only. Unstake these coins in Staking first.')
+    }
+    const all = gathered.filter((u) => u.tokenId === undefined && u.keyScript !== 'delegated')
     const frozen = await this.deps.frozen()
+    const reserved = await this.deps.reserved?.() ?? new Set<string>()
     if (outpoints !== undefined && outpoints.length > 0) {
       const wanted = new Set(outpoints)
+      if ([...wanted].some((o) => reserved.has(o))) throw new Error('These coins are reserved by an unfinished transaction. Resolve it in Staking before spending them.')
       if ([...wanted].some((o) => frozen.has(o))) {
         throw new Error('Frozen coins can’t be spent. Unfreeze them first.')
       }
@@ -113,7 +116,7 @@ export class SendService {
       if (manual.some((u) => u.maturityUnknown === true)) throw new Error('Could not verify when some selected coins become spendable. Refresh and try again.')
       return { utxos: [], manualInputs: manual }
     }
-    return { utxos: all.filter((u) => !frozen.has(outpointOf(u)) && isMature(u)) }
+    return { utxos: all.filter((u) => !frozen.has(outpointOf(u)) && !reserved.has(outpointOf(u)) && isMature(u)) }
   }
 
   // The largest amount sendable in one transaction: the whole spendable pool (or
@@ -141,8 +144,8 @@ export class SendService {
   async buildTokenSend(tokenId: string, recipient: string, tokenAmount: bigint): Promise<TokenSendPreview> {
     this.startBuild()
     const generation = this.generation
-    const all = await this.deps.gather()
-    const frozen = await this.deps.frozen()
+    const all = (await this.deps.gather()).filter((u) => u.keyScript !== 'delegated')
+    const frozen = new Set([...await this.deps.frozen(), ...await this.deps.reserved?.() ?? []])
     const tokenUtxos: SpendableTokenUtxo[] = all
       .filter((u) => u.tokenId === tokenId && u.tokenAmount !== undefined && !frozen.has(outpointOf(u)) && isMature(u))
       .map((u) => ({ ...u, tokenAmount: u.tokenAmount as bigint }))
@@ -150,9 +153,7 @@ export class SendService {
 
     const rate = await this.deps.feeRate()
 
-    const [classicalChange, pqChange] = await Promise.all([this.deps.getChangeAddress(), this.deps.getPqChangeAddress()])
-    const changeFor = (algo: ChangeBranch): string => (algo === 'falcon512' ? pqChange : classicalChange)
-    const built = buildTokenSendWithFee({
+    const { built } = await buildWithChange(recipient, (changeFor) => buildTokenSendWithFee({
       tokenHash: tokenId,
       tokenUtxos,
       nativeUtxos,
@@ -160,8 +161,9 @@ export class SendService {
       tokenAmount,
       tokenChangeAddressFor: changeFor,
       nativeChangeAddressFor: changeFor,
-    }, rate)
+    }, rate), (algo) => algo === 'falcon512' ? this.deps.getPqChangeAddress() : this.deps.getChangeAddress())
     this.checkBuild(generation)
+    assertBroadcastSize(draftSizeUpperBound([...tokenUtxos, ...nativeUtxos], built.unsigned))
     this.pending = {
       unsigned: built.unsigned,
       advance: [...new Set([built.tokenChangeAlgo, built.nativeChangeAlgo].filter((a): a is ChangeBranch => a !== undefined))],
@@ -197,9 +199,15 @@ export class SendService {
     }
     // A retry must retain the exact wire bytes: Falcon signatures are randomized,
     // so signing the same draft again can produce a different transaction id.
-    pending.signed ??= await this.deps.sign(pending.unsigned)
+    if (pending.signed === undefined) {
+      await this.deps.assertInputs?.(pending.unsigned)
+      check()
+      pending.signed = await this.deps.sign(pending.unsigned)
+    }
     check()
     const signed = pending.signed
+    try { assertBroadcastSize(signed.rawHex.length / 2) }
+    catch (error) { this.pending = null; throw new SendNeedsReviewError(error instanceof Error ? error.message : 'Transaction too large.') }
     const known = async (): Promise<boolean> => {
       try { return await this.deps.isKnownTransaction?.(signed.txid) === true } catch { return false }
     }
@@ -246,6 +254,15 @@ export class SendService {
     this.generation++
     this.pending = null
     this.confirming = null
+  }
+
+  reservedOutpoints(): ReadonlySet<string> {
+    return new Set(this.pending?.signed === undefined && this.confirming === null ? []
+      : this.pending?.unsigned.inputs.map((i) => `${i.prevTxid}:${i.vout}`) ?? [])
+  }
+
+  reservedOutputHashes(): readonly string[] {
+    return this.pending?.signed === undefined ? [] : this.pending.unsigned.outputs.map((o) => o.scripthash)
   }
 
   private startBuild(): void {

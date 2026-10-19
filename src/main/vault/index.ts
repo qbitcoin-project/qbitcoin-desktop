@@ -7,7 +7,12 @@ import { btcEsploraDefaultsFor, BtcEsploraClient, ChainClient, type NodeEndpoint
 import { generateMnemonic, hash256, isSchnorrEnabled, masterKeyFromSeed, mnemonicToSeed, parseAccountXpub, toHex, validateMnemonic, type HDKey, type Network } from '@qbtc/crypto'
 import type { Vault } from '@qbtc/vault'
 import { RestorableVault } from './RestorableVault'
-import { addressFromScripthash, addressFromXpub, decodeAddress, DOWNGRADE, exportAccountXpub, UPGRADE, validateAddress } from '../brand/crypto'
+import { addressFromPubkey, addressFromScripthash, addressFromXpub, decodeAddress, DOWNGRADE, exportAccountXpub, UPGRADE, validateAddress } from '../brand/crypto'
+import { DELEGATE_PROFILES } from '../brand/delegation'
+import { DelegationService } from '../wallet/DelegationService'
+import { DelegationMetaStore } from '../wallet/delegationStore'
+import { deriveStakingKey, fixedStakingOwners, type StakingOwner } from '../wallet/stakingKeys'
+import { SpendCoordinator } from '../wallet/SpendCoordinator'
 import { defaultNodesFor } from '../brand/nodes'
 import { PROFILE } from '../brand/profile'
 import type { AddressAlgo, KeyInspection, NodeKind, NodeSettings, NodeStatus, SendPreview, SendResult, SweepScan, UpgradeConvertRequest, UpgradePlanView, VaultStatus, WalletInfo, WatchInput } from '../../shared/protocol'
@@ -16,7 +21,7 @@ import { AddressService, type WalletVault } from '../wallet/AddressService'
 import { createSeedAddressSource, type AddressSource } from '../wallet/AddressSource'
 import { KeyStore } from '../wallet/keyStore'
 import { ImportedKeySession } from '../wallet/ImportedKeySession'
-import { createKeyAddressSource, importedKeyFromStored, importedKeyFromWif, inspectWifKey, keyInputBytes, keyReceiveOps, signUnsignedTxWithKey, type ImportedKey } from '../wallet/keyWallet'
+import { buildSignedTransactionWithKey, createKeyAddressSource, importedKeyFromStored, importedKeyFromWif, inspectWifKey, keyInputBytes, keyReceiveOps, ordinaryKeyAddress, signUnsignedTxWithKey, type ImportedKey } from '../wallet/keyWallet'
 import { encodeDelegatePubkeyhash } from '../wallet/delegation'
 import { SeedStore } from '../wallet/seedStore'
 import { WalletBackupService } from '../wallet/WalletBackupService'
@@ -28,7 +33,7 @@ import { CoinMetaStore } from '../wallet/coinMeta'
 import { ContactService } from '../wallet/ContactService'
 import { WalletMetaStore } from '../wallet/meta'
 import { SendService } from '../wallet/SendService'
-import { deriveInputKeypair, signUnsignedTx } from '../wallet/signTx'
+import { buildSignedTransaction, deriveInputKeypair, signUnsignedTx } from '../wallet/signTx'
 import { SnapshotStore } from '../wallet/snapshot'
 import { gatherFromActive, type GatheredUtxo } from '../wallet/spendable'
 import { withMaturity } from '../wallet/maturity'
@@ -63,6 +68,8 @@ export interface WalletCore {
 // active wallet changes; the Vault, address book and registry are app-global and
 // outlive a switch.
 interface WalletSession {
+  readonly staking: DelegationService | null
+  readonly spending: SpendCoordinator
   readonly addresses: AddressOps
   readonly chain: ChainOps
   readonly send: SendOps
@@ -143,6 +150,9 @@ export function createWalletCore(): WalletCore {
   // source (xpub / address list) and refuses to sign. Sealed stores use the Vault's
   // app-data key either way.
   const buildSession = (walletId: string): WalletSession => {
+    const spending = new SpendCoordinator()
+    let stakingSvc: DelegationService | null = null
+    let sendSvc: SendService | null = null
     const dir = walletDir(userData, walletId)
     const wf = (name: string): string => join(dir, name)
     const kind = registry.get(walletId)?.kind ?? 'seed'
@@ -173,18 +183,25 @@ export function createWalletCore(): WalletCore {
       const seedStore = walletId === DEFAULT_WALLET_ID ? null : new SeedStore(new FileVaultStorage(wf('seed.json')), vault)
       let cachedKey: HDKey | null = null
       const getMasterKey = async (): Promise<HDKey> => {
+        spending.check()
         if (seedStore === null) return vault.getMasterKey()
         if (cachedKey === null) {
           const stored = await seedStore.load()
+          spending.check()
           if (stored === null) throw new Error('Seed for this wallet is missing or could not be opened.')
-          cachedKey = masterKeyFromSeed(mnemonicToSeed(stored.mnemonic, stored.passphrase))
+          const seed = mnemonicToSeed(stored.mnemonic, stored.passphrase)
+          try { cachedKey = masterKeyFromSeed(seed) } finally { seed.fill(0) }
         }
         return cachedKey
       }
       seedMasterKey = getMasterKey
       const keyVault: WalletVault = { getMasterKey, on: (l) => vault.on(l) }
       const source = createSeedAddressSource({ getMasterKey, metaStore, network: NETWORK })
-      seedAddrSvc = new AddressService(keyVault, metaStore, NETWORK)
+      seedAddrSvc = new AddressService(keyVault, metaStore, NETWORK, 0, {
+        lookup: chainClient, check: () => spending.check(),
+        reserved: async () => new Set([...await stakingSvc?.reservedChangeAddresses() ?? [],
+          ...sendSvc?.reservedOutputHashes().map((hash) => addressFromScripthash(Uint8Array.from(Buffer.from(hash, 'hex')), NETWORK)) ?? []]),
+      })
       if (UPGRADE !== null) {
         upgradeSvc = new UpgradeService(
           keyVault,
@@ -200,6 +217,7 @@ export function createWalletCore(): WalletCore {
       resetSource = () => {
         source.reset()
         seedStore?.reset()
+        cachedKey?.wipePrivateData()
         cachedKey = null
       }
     } else if (kind === 'key') {
@@ -210,7 +228,7 @@ export function createWalletCore(): WalletCore {
       const keySession = new ImportedKeySession(() => keyStore.load(), (stored) => importedKeyFromStored(stored, NETWORK))
       const getKey = (): Promise<ImportedKey> => keySession.get()
       keyProvider = getKey
-      addressSource = createKeyAddressSource(getKey)
+      addressSource = createKeyAddressSource(getKey, NETWORK)
       addresses = keyReceiveOps(getKey)
       resetSource = () => {
         keySession.dispose()
@@ -238,8 +256,10 @@ export function createWalletCore(): WalletCore {
       // Reuse the chain service's shared, de-duplicated discovery — no second gap-scan.
       const promise = (async () => {
         const gathered = await withMaturity(await gatherFromActive(await chain.spendableAddresses(), chainClient), chainClient, NETWORK)
-        const inputBytes = keyProvider === null ? undefined : keyInputBytes(await keyProvider())
-        return inputBytes === undefined ? gathered : gathered.map((u) => ({ ...u, inputBytes }))
+        const key = keyProvider === null ? undefined : await keyProvider()
+        const inputBytes = key === undefined ? undefined : keyInputBytes(key)
+        return inputBytes === undefined ? gathered : gathered.map((u) => u.address === key!.address
+          ? { ...u, inputBytes, keyScript: 'delegated' as const } : { ...u, keyScript: 'ordinary' as const })
       })()
       gatherMemo = { at, promise }
       promise.catch(() => {
@@ -251,9 +271,11 @@ export function createWalletCore(): WalletCore {
       gatherMemo = null
     }
 
-    const chain = new ChainService(chainClient, addressSource.branches, { btcNetwork: NETWORK })
+    const chain = new ChainService(chainClient, addressSource.branches, { btcNetwork: NETWORK,
+      delegatedAddresses: () => stakingSvc?.addresses() ?? Promise.resolve([]) })
     const coins = new CoinService({
-      gather: gatherAll,
+      gather: async () => withMaturity(await gatherFromActive(await chain.inventoryAddresses(), chainClient), chainClient, NETWORK),
+      reservations: async () => new Map([...await stakingSvc?.reservations() ?? [], ...[...sendSvc?.reservedOutpoints() ?? []].map((id) => [id, "send"] as const)]),
       tipHeight: async () => (await chainClient.getBlockchainInfo()).tipHeight,
       meta: coinMeta,
     })
@@ -262,21 +284,23 @@ export function createWalletCore(): WalletCore {
     const frozenSet = async (): Promise<ReadonlySet<string>> => {
       const meta = await coinMeta.load()
       return new Set(
-        Object.entries(meta)
+        [...Object.entries(meta)
           .filter(([, m]) => m.frozen === true)
           .map(([outpoint]) => outpoint),
+        ...await stakingSvc?.reservedOutpoints() ?? [],
+        ...sendSvc?.reservedOutpoints() ?? []],
       )
     }
-    const broadcast = async (rawHex: string): Promise<string> => (await chainClient.broadcastTransaction(rawHex)).txid
+    const broadcast = async (rawHex: string): Promise<string> => { spending.check(); return (await chainClient.broadcastTransaction(rawHex)).txid }
     const isKnownTransaction = async (txid: string): Promise<boolean> => (await chainClient.getTransaction(txid)).txid === txid
-    let sendSvc: SendService | null = null
     if (seedAddrSvc !== null && seedMasterKey !== null) {
       const sa = seedAddrSvc
       const signWith = seedMasterKey
       sendSvc = new SendService({
         gather: gatherAll,
         feeRate: async () => (await chain.estimateFee()).medium,
-        frozen: frozenSet,
+        frozen: async () => new Set(Object.entries(await coinMeta.load()).filter(([, entry]) => entry.frozen).map(([id]) => id)),
+        reserved: async () => new Set([...await stakingSvc?.reservedOutpoints() ?? [], ...sendSvc?.reservedOutpoints() ?? []]),
         getChangeAddress: () => sa.getChangeAddress(),
         getPqChangeAddress: () => sa.getPqChangeAddress(),
         advanceChange: (algo) => (algo === 'falcon512' ? sa.advancePqChange() : sa.advanceChange()),
@@ -286,17 +310,18 @@ export function createWalletCore(): WalletCore {
         onSpent: bustGather,
         onBroadcastFailure: bustGather,
         isKnownTransaction,
+        assertInputs: async (unsigned) => { spending.check(); await stakingSvc?.assertOrdinaryInputs(unsigned); spending.check() },
       })
     } else if (keyProvider !== null) {
       const getKey = keyProvider
-      const ownAddress = async (): Promise<string> => (await getKey()).address
+      const ownAddress = async (): Promise<string> => ordinaryKeyAddress(await getKey(), NETWORK)
       sendSvc = new SendService({
         gather: gatherAll,
         feeRate: async () => (await chain.estimateFee()).medium,
-        frozen: frozenSet,
-        // No derivation on a key wallet: change (either branch) returns to its
-        // own single address, and there is no index to advance. Address reuse
-        // is the accepted trade-off of single-key wallets.
+        frozen: async () => new Set(Object.entries(await coinMeta.load()).filter(([, entry]) => entry.frozen).map(([id]) => id)),
+        reserved: async () => new Set([...await stakingSvc?.reservedOutpoints() ?? [], ...sendSvc?.reservedOutpoints() ?? []]),
+        // Use the ordinary owner address so change cannot silently re-enter
+        // delegation after a return. Single keys have no index to advance.
         getChangeAddress: ownAddress,
         getPqChangeAddress: ownAddress,
         advanceChange: async () => undefined,
@@ -305,9 +330,91 @@ export function createWalletCore(): WalletCore {
         onSpent: bustGather,
         onBroadcastFailure: bustGather,
         isKnownTransaction,
+        assertInputs: async (unsigned) => { spending.check(); await stakingSvc?.assertOrdinaryInputs(unsigned); spending.check() },
       })
     }
     const send: SendOps = sendSvc ?? watchOnlySend()
+
+    if (seedMasterKey !== null || keyProvider !== null) {
+      const master = seedMasterKey
+      const imported = keyProvider
+      const sa = seedAddrSvc
+      const ownerKeys = async (owner: StakingOwner): Promise<{ privateKey: Uint8Array; publicKey: Uint8Array }> => {
+        spending.check()
+        let pair: { privateKey: Uint8Array; publicKey: Uint8Array }
+        if (owner.kind === 'hd' && master !== null) pair = await deriveStakingKey(await master(), owner, NETWORK)
+        else if (owner.kind === 'key' && imported !== null) {
+          const key = await imported()
+          spending.check()
+          if (key.algo !== owner.algo) throw new Error('The staking owner algorithm does not match this wallet.')
+          pair = { privateKey: key.privateKey.slice(), publicKey: key.publicKey.slice() }
+        } else throw new Error('The staking owner does not belong to this wallet.')
+        try { spending.check(); return pair } catch (error) { pair.privateKey.fill(0); throw error }
+      }
+      stakingSvc = new DelegationService({
+        network: NETWORK, profiles: DELEGATE_PROFILES, reader: chainClient, coordinator: spending,
+        store: new DelegationMetaStore(new FileVaultStorage(wf('delegation.json')), vault, walletId, NETWORK),
+        wallet: {
+          owners: async () => {
+            spending.check()
+            if (master !== null) return fixedStakingOwners(sa!.account)
+            const key = await imported!()
+            spending.check()
+            return key.algo === 'schnorr' && key.delegation === undefined ? [] : [{ kind: 'key', algo: key.algo }]
+          },
+          publicKey: async (owner) => {
+            const pair = await ownerKeys(owner)
+            try { return pair.publicKey } finally { pair.privateKey.fill(0) }
+          },
+          keypair: ownerKeys,
+          importedDelegate: imported === null ? undefined : async () => (await imported()).delegation?.delegatePubkeyhash,
+          fundingPool: async () => {
+            bustGather()
+            const frozen = await frozenSet()
+            return (await gatherAll()).filter((u) => u.keyScript !== 'delegated' && !frozen.has(`${u.txid}:${u.vout}`))
+          },
+          ordinaryInputAddress: async (input) => {
+            spending.check()
+            if (master !== null) {
+              const pair = await deriveInputKeypair(await master(), input, NETWORK)
+              try { spending.check(); return addressFromPubkey(pair.publicKey, input.algo, NETWORK) }
+              finally { pair.privateKey.fill(0) }
+            }
+            const key = await imported!()
+            spending.check()
+            if (input.algo !== key.algo) throw new Error('The original input does not belong to this imported key.')
+            return ordinaryKeyAddress(key, NETWORK)
+          },
+          recoveryExcludedOutpoints: async () => new Set([...Object.entries(await coinMeta.load()).filter(([, entry]) => entry.frozen).map(([id]) => id),
+            ...sendSvc?.reservedOutpoints() ?? []]),
+          changeAddress: async (algo) => {
+            spending.check()
+            if (sa !== null) return algo === 'falcon512' ? sa.getPqChangeAddress() : sa.getChangeAddress()
+            const key = await imported!()
+            spending.check()
+            return addressFromPubkey(key.publicKey, key.algo, NETWORK)
+          },
+          consumeChange: async (algo, expected) => {
+            spending.check()
+            if (sa === null) return
+            await sa.recordChangeAddress(algo, expected)
+          },
+          feeRate: async () => (await chain.estimateFee()).medium,
+          signFunding: async (unsigned) => {
+            spending.check()
+            return master !== null ? signUnsignedTx(unsigned, await master(), NETWORK) : signUnsignedTxWithKey(unsigned, await imported!(), NETWORK)
+          },
+          signOrdinary: async (unsigned) => {
+            spending.check()
+            const signed = master !== null ? await buildSignedTransaction(unsigned, await master(), NETWORK, true) : await buildSignedTransactionWithKey(unsigned, await imported!(), NETWORK, true)
+            spending.check()
+            return signed
+          },
+          excludedOutpoints: frozenSet,
+          changed: bustGather,
+        },
+      })
+    }
 
     // Downgrade flow: seed wallets only (needs per-input derivation for the
     // reclaim key), gated on the brand's DOWNGRADE consensus params.
@@ -374,7 +481,14 @@ export function createWalletCore(): WalletCore {
             return kp.publicKey
           },
           inputKeypair: async (input) => deriveInputKeypair(await signWith(), input, NETWORK),
-          signUnsigned: async (unsigned) => signUnsignedTx(unsigned, await signWith(), NETWORK),
+          signUnsigned: async (unsigned) => {
+            spending.check()
+            await stakingSvc?.assertOrdinaryInputs(unsigned)
+            spending.check()
+            const signed = await signUnsignedTx(unsigned, await signWith(), NETWORK)
+            spending.check()
+            return signed
+          },
         },
       )
     }
@@ -415,8 +529,11 @@ export function createWalletCore(): WalletCore {
     const prewarm = (): void => {
       void gatherAll().catch(() => {})
       void chain.prewarmAddressIndex().catch(() => {})
+      stakingSvc?.start()
     }
     const reset = (): void => {
+      spending.dispose()
+      stakingSvc?.dispose()
       sendSvc?.reset()
       coinMeta.reset()
       txLabels.reset()
@@ -425,7 +542,7 @@ export function createWalletCore(): WalletCore {
       bustGather()
     }
 
-    return { addresses, chain: chainOps, send, coins, upgrade: upgradeSvc, downgrade: downgradeSvc, prewarm, reset }
+    return { addresses, chain: chainOps, send, coins, upgrade: upgradeSvc, downgrade: downgradeSvc, staking: stakingSvc, spending, prewarm, reset }
   }
 
   let unlocked = false
@@ -807,16 +924,19 @@ export function createWalletCore(): WalletCore {
       // a fresh session; callbacks retaining the old provider stay invalid.
       active.reset()
       active = buildSession(registry.getActiveId())
+      const warmingSession = active
       // Load any sealed own-node credential now the app-data key is available; if the
       // own node is active, rebuild the client with auth before warming, else just warm.
       void nodeAuthStore
         .load()
+        .catch(() => null)
         .then((auth) => {
+          if (!unlocked || active !== warmingSession) return
           ownAuth = auth
           if (auth !== null && nodeConfig.getSettings().selected === 'own') applyNode()
           else active.prewarm()
         })
-        .catch(() => active.prewarm())
+        .catch(() => { /* A lock during warm-up ends this session. */ })
     } else if (event.type === 'locked' || event.type === 'destroyed') {
       unlocked = false
       ownAuth = null
@@ -838,6 +958,10 @@ export function createWalletCore(): WalletCore {
   const requireDowngrade = (): DowngradeService => {
     if (active.downgrade === null) throw new Error('The BTC downgrade is not available for this wallet.')
     return active.downgrade
+  }
+  const requireStaking = (): DelegationService => {
+    if (active.staking === null) throw new Error('Staking needs an ECDSA or Falcon owner key.')
+    return active.staking
   }
   const parseAtomic = (s: string): bigint => {
     if (!/^\d+$/.test(s)) throw new Error('Enter a valid atomic amount.')
@@ -881,7 +1005,7 @@ export function createWalletCore(): WalletCore {
       buildSend: (recipient, amountAtomic, outpoints, sendMax) => active.send.buildSend(recipient, amountAtomic, outpoints, sendMax),
       maxSendable: (outpoints) => active.send.maxSendable(outpoints),
       buildTokenSend: (tokenId, recipient, tokenAmount) => active.send.buildTokenSend(tokenId, recipient, tokenAmount),
-      confirmSend: () => active.send.confirmSend(),
+      confirmSend: () => { const session = active; return session.spending.run(() => session.send.confirmSend()) },
     },
     coins: {
       list: () => active.coins.list(),
@@ -950,8 +1074,17 @@ export function createWalletCore(): WalletCore {
         }))
       },
       plan: async (amountAtomic) => requireDowngrade().plan(parseAtomic(amountAtomic)),
-      convert: async (amountAtomic, btcAddress) => requireDowngrade().convert(parseAtomic(amountAtomic), btcAddress),
-      reclaim: async (freezeTxid) => requireDowngrade().reclaim(freezeTxid),
+      convert: async (amountAtomic, btcAddress) => { const session = active; const svc = requireDowngrade(); return session.spending.run(() => svc.convert(parseAtomic(amountAtomic), btcAddress)) },
+      reclaim: async (freezeTxid) => { const session = active; const svc = requireDowngrade(); return session.spending.run(() => svc.reclaim(freezeTxid)) },
+    },
+    staking: {
+      info: async () => active.staking?.info() ?? { enabled: false, network: NETWORK, fundingEnabled: false, minimumVerified: false, algorithms: [] },
+      list: () => requireStaking().list(), refresh: () => requireStaking().refresh(),
+      buildFunding: (request) => requireStaking().buildFunding(request),
+      buildWithdrawal: (request) => requireStaking().buildWithdrawal(request),
+      confirm: (id) => requireStaking().confirm(id), retry: (id) => requireStaking().retry(id),
+      buildRecovery: (id) => requireStaking().buildRecovery(id),
+      setAutoRetry: (id, enabled) => requireStaking().setAutoRetry(id, enabled),
     },
   })
 

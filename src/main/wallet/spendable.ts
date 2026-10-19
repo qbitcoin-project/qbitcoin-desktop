@@ -11,6 +11,8 @@ export interface SpendableBackend extends AddressLookup {
 /** A spendable UTXO enriched with coin-control fields (owning address +
  *  confirmation state). Still assignable to SpendableUtxo for tx building. */
 export interface GatheredUtxo extends SpendableUtxo, MaturityInfo {
+  readonly delegated?: boolean
+  readonly availabilityUnknown?: boolean
   readonly address: string
   readonly confirmed: boolean
   readonly blockHeight?: number
@@ -57,7 +59,7 @@ export async function gatherSpendable(
 /** A discovered, active address to pull UTXOs from, tagged with its branch's
  *  signature algorithm and derivation scheme (so each UTXO is attributed to the
  *  right key — on the right scheme's path — for signing). */
-export type ActiveAddress = Pick<DiscoveredAddress, 'address' | 'chain' | 'index'> & { readonly algo: Algo; readonly scheme?: string }
+export type ActiveAddress = Pick<DiscoveredAddress, 'address' | 'chain' | 'index'> & { readonly algo: Algo; readonly scheme?: string; readonly delegated?: boolean; readonly availabilityUnknown?: boolean }
 
 /** The active subset of a branch's discovered addresses (the inactive gap-padding
  *  can't hold UTXOs), tagged with the branch's algorithm + scheme. */
@@ -87,6 +89,8 @@ export async function gatherFromActive(active: readonly ActiveAddress[], backend
         index: a.index,
         algo: a.algo,
         scheme: a.scheme,
+        ...(a.delegated ? { delegated: true } : {}),
+        ...(a.availabilityUnknown ? { availabilityUnknown: true } : {}),
         address: a.address,
         confirmed: utxo.status.confirmed,
         blockHeight: utxo.status.blockHeight,

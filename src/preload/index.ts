@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { BridgeApi } from '../shared/bridge'
+import type { StakingInfo, StakingPreview, StakingResult, StakingSnapshot } from '../shared/staking'
 import { SHOW_CHANGELOG_CHANNEL, type AppNavigationApi } from '../shared/appNavigation'
 import { PRIVACY_CHANNEL, PRIVACY_EVENT_CHANNEL, type PrivacyApi, type PrivacyRequest, type SessionRevoked } from '../shared/privacy'
 import {
@@ -53,6 +54,15 @@ async function request<T>(req: WalletRequest | VaultRequest): Promise<WalletResp
 }
 
 const api: BridgeApi<WalletApi> = {
+  stakingInfo: () => request<StakingInfo>({ type: 'staking.info' }),
+  stakingList: () => request<StakingSnapshot>({ type: 'staking.list' }),
+  stakingRefresh: () => request<StakingSnapshot>({ type: 'staking.refresh' }),
+  stakingBuildFunding: (funding) => request<StakingPreview>({ type: 'staking.buildFunding', request: funding }),
+  stakingBuildWithdrawal: (withdrawal) => request<StakingPreview>({ type: 'staking.buildWithdrawal', request: withdrawal }),
+  stakingConfirm: (draftId) => request<StakingResult>({ type: 'staking.confirm', draftId }),
+  stakingRetry: (operationId) => request<StakingResult>({ type: 'staking.retry', operationId }),
+  stakingBuildRecovery: (operationId) => request<StakingPreview>({ type: 'staking.buildRecovery', operationId }),
+  stakingSetAutoRetry: (operationId, enabled) => request<void>({ type: 'staking.setAutoRetry', operationId, enabled }),
   ping: () => request<PingResult>({ type: 'ping' }),
   getStatus: () => request<VaultStatus>({ type: 'vault.getStatus' }),
   create: (mnemonic, password) => request<VaultStatus>({ type: 'vault.create', mnemonic, password }),

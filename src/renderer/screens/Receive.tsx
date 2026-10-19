@@ -163,7 +163,8 @@ export function Receive({ initialAlgo = 'ecdsa' }: { initialAlgo?: AddressAlgo }
 
         {singleKey && (
           <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-500)', lineHeight: 1.5, textAlign: 'center' }}>
-            This wallet is an imported single key: it has exactly one address.
+            {activeWallet.delegatePubkeyhash === undefined ? 'This wallet is an imported single key: it has exactly one address.'
+              : 'This is the delegation address of your imported key. Its ordinary return address is also tracked by the wallet.'}
           </p>
         )}
         {!singleKey && algo === 'falcon512' && (

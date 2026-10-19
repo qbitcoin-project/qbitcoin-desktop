@@ -3,6 +3,7 @@ import { activeScheme } from '../brand/crypto'
 import type { AddressAlgo, ReceiveAddressEntry } from '../../shared/protocol'
 import { deriveClassicalAddress, deriveFalconAddress } from './addresses'
 import { indicesFor, withIndices, type SchemeIndices, type WalletMeta, type WalletMetaStore } from './meta'
+import { GAP_LIMIT_CHANGE, isActive, type AddressLookup } from './discovery'
 
 // What the service needs to derive: the master key (read inside main only) and a way
 // to know when to drop cached metadata. `getMasterKey` is async so a non-primary seed
@@ -21,12 +22,14 @@ export interface WalletVault {
 // created, or is destroyed, so a different seed never reuses stale indices.
 export class AddressService {
   private meta: WalletMeta | null = null
+  private readonly selectedChange = new Map<'ecdsa' | 'falcon512', number>()
 
   constructor(
     private readonly vault: WalletVault,
     private readonly metaStore: WalletMetaStore,
     private readonly network: Network,
-    private readonly account = 0,
+    readonly account = 0,
+    private readonly allocation?: { lookup: AddressLookup; reserved(): Promise<ReadonlySet<string>>; check(): void },
   ) {
     this.vault.on((event) => {
       if (event.type === 'locked' || event.type === 'destroyed' || event.type === 'created') {
@@ -73,6 +76,7 @@ export class AddressService {
 
   /** Current change address (change chain, at the stored change index). */
   async getChangeAddress(): Promise<string> {
+    if (this.allocation !== undefined) return this.recoverableChange('ecdsa')
     const cur = await this.activeIndices()
     return this.deriveAt(1, cur.changeIndex)
   }
@@ -80,11 +84,12 @@ export class AddressService {
   /** Advance the change index after a send that produced change. Persists. */
   async advanceChange(): Promise<void> {
     const cur = await this.activeIndices()
-    await this.saveActiveIndices({ ...cur, changeIndex: cur.changeIndex + 1 })
+    await this.saveActiveIndices({ ...cur, changeIndex: Math.max(cur.changeIndex, (this.selectedChange.get('ecdsa') ?? cur.changeIndex) + 1) })
   }
 
   /** Current PQ (Falcon) change address (change chain, at the PQ change index). */
   async getPqChangeAddress(): Promise<string> {
+    if (this.allocation !== undefined) return this.recoverableChange('falcon512')
     const cur = await this.activeIndices()
     const master = await this.vault.getMasterKey()
     return deriveFalconAddress(master, { account: this.account, chain: 1, index: cur.pqChangeIndex, network: this.network })
@@ -93,7 +98,47 @@ export class AddressService {
   /** Advance the PQ change index after a PQ send that produced change. Persists. */
   async advancePqChange(): Promise<void> {
     const cur = await this.activeIndices()
-    await this.saveActiveIndices({ ...cur, pqChangeIndex: cur.pqChangeIndex + 1 })
+    await this.saveActiveIndices({ ...cur, pqChangeIndex: Math.max(cur.pqChangeIndex, (this.selectedChange.get('falcon512') ?? cur.pqChangeIndex) + 1) })
+  }
+
+  /** Fill unused holes before issuing beyond the seed scanner's gap. Pending
+   * signatures reserve their addresses durably; a full gap must settle first. */
+  private async recoverableChange(algo: 'ecdsa' | 'falcon512'): Promise<string> {
+    const policy = this.allocation!
+    const reserved = await policy.reserved()
+    const master = await this.vault.getMasterKey()
+    let inactive = 0
+    for (let index = 0; index < 1000; index++) {
+      policy.check()
+      const opts = { account: this.account, chain: 1 as const, index, network: this.network }
+      const address = await (algo === 'falcon512' ? deriveFalconAddress(master, opts) : deriveClassicalAddress(master, opts))
+      const info = await policy.lookup.getAddressInfo(address)
+      policy.check()
+      // Mempool history can disappear without ever confirming. It reserves the
+      // address, but cannot extend the gap that a fresh seed restore can bridge.
+      if (info.chain.fundedTxCount > 0 || info.chain.spentTxCount > 0) { inactive = 0; continue }
+      if (!isActive(info) && !reserved.has(address)) {
+        this.selectedChange.set(algo, index)
+        return address
+      }
+      if (++inactive >= GAP_LIMIT_CHANGE) break
+    }
+    throw new Error('Pending transactions occupy the recoverable change-address range. Resolve their status before creating another transaction.')
+  }
+
+  async recordChangeAddress(algo: 'ecdsa' | 'falcon512', expected: string): Promise<void> {
+    const master = await this.vault.getMasterKey()
+    for (let index = 0; index < 1000; index++) {
+      this.allocation?.check()
+      const opts = { account: this.account, chain: 1 as const, index, network: this.network }
+      const address = await (algo === 'falcon512' ? deriveFalconAddress(master, opts) : deriveClassicalAddress(master, opts))
+      if (address !== expected) continue
+      const cur = await this.activeIndices()
+      const field = algo === 'falcon512' ? 'pqChangeIndex' : 'changeIndex'
+      if (cur[field] < index + 1) await this.saveActiveIndices({ ...cur, [field]: index + 1 })
+      return
+    }
+    throw new Error('The saved change address is outside the supported recovery range.')
   }
 
   private async deriveAt(chain: 0 | 1, index: number): Promise<string> {
@@ -124,7 +169,9 @@ export class AddressService {
 
   private async saveActiveIndices(indices: SchemeIndices): Promise<void> {
     const next = withIndices(await this.ensureMeta(), activeScheme().id, indices)
+    this.allocation?.check()
     await this.metaStore.save(next)
+    this.allocation?.check()
     this.meta = next
   }
 }

@@ -4,6 +4,7 @@ import type { GatheredUtxo } from './spendable'
 
 export interface CoinDeps {
   gather(): Promise<GatheredUtxo[]>
+  reservations?(): Promise<ReadonlyMap<string, string>>
   tipHeight(): Promise<number>
   meta: CoinMetaStore
 }
@@ -17,6 +18,9 @@ export class CoinService {
 
   async list(): Promise<UtxoView[]> {
     const [utxos, tip, meta] = await Promise.all([this.deps.gather(), this.deps.tipHeight(), this.deps.meta.load()])
+    let reservations: ReadonlyMap<string, string> = new Map()
+    let unavailable = false
+    try { reservations = await this.deps.reservations?.() ?? reservations } catch { unavailable = true }
     // Both native and token UTXOs are listed; a token UTXO has a zero native value
     // and carries its token id/amount (the renderer renders it as a token row and
     // keeps the native totals token-free). Coin-control selection stays native-only.
@@ -32,6 +36,9 @@ export class CoinService {
         algo: u.algo,
         label: entry.label,
         frozen: entry.frozen ?? false,
+        ...(u.delegated ? { delegated: true } : {}),
+        ...(reservations.has(outpoint) ? { reservedBy: reservations.get(outpoint)! } : {}),
+        ...(unavailable || u.availabilityUnknown ? { availabilityUnknown: true } : {}),
         ...(u.maturesAt !== undefined ? { maturesAt: u.maturesAt } : {}),
         ...(u.maturityUnknown === true ? { maturityUnknown: true } : {}),
       }

@@ -53,7 +53,7 @@ export function toCryptoTransaction(unsigned: UnsignedTx): Transaction {
 // branch AND derivation scheme. Runs in main only; each derived private key is
 // wiped immediately after signing. Returns the signed Transaction (siglist +
 // redeem script attached).
-export async function buildSignedTransaction(unsigned: UnsignedTx, master: HDKey, network: Network): Promise<Transaction> {
+export async function buildSignedTransaction(unsigned: UnsignedTx, master: HDKey, network: Network, ordinaryOnly = false): Promise<Transaction> {
   const tx = toCryptoTransaction(unsigned)
   // Each input is signed on its own branch by its own algorithm: classical inputs
   // with a secp256k1 child key (sync), PQ inputs with a Falcon-512 keypair (async,
@@ -64,7 +64,7 @@ export async function buildSignedTransaction(unsigned: UnsignedTx, master: HDKey
   // falls back to the active scheme (inputs from pre-multi-scheme drafts).
   // signTransaction dispatches the actual signing per `algo`.
   const signers: SigningInput[] = await Promise.all(
-    unsigned.inputs.map(async (input, index): Promise<SigningInput> => {
+    unsigned.inputs.map((input, index) => ({ input, index })).filter(({ input }) => !ordinaryOnly || input.keyScript !== 'delegated').map(async ({ input, index }): Promise<SigningInput> => {
       const kp = await deriveInputKeypair(master, input, network)
       return { inputIndex: index, privateKey: kp.privateKey, publicKey: kp.publicKey, algo: input.algo === 'falcon512' ? 'falcon512' : 'ecdsa' }
     }),

@@ -8,6 +8,7 @@ import {
   sighash,
   signWithAlgorithm,
   signTransaction,
+  scriptP2PK,
   toHex,
   txid as computeTxid,
   type Algorithm,
@@ -30,10 +31,11 @@ import { serializedInputBytes, signaturePlaceholder } from './txSize'
 
 // A single imported private key (kind: 'key' wallet) — the building blocks.
 //
-// A key wallet has exactly ONE address, decided at import: no HD tree, no
-// fresh receive/change addresses. Change from its sends returns to the same
-// address (accepted trade-off: the pubkey is public on-chain after the first
-// spend). Raw signing keys stay in main; WIF backup is a separate, explicit
+// A key wallet has one fixed owner key: no HD tree or fresh addresses.
+// A delegated WIF also tracks the ordinary address of that key so returned
+// coins remain visible and spendable. Change returns to the ordinary address,
+// so spending returned coins cannot delegate their change again. Raw signing
+// keys stay in main; WIF backup is a separate, explicit
 // password-authenticated operation in WalletBackupService.
 
 /** An imported key, materialized for a session: raw key material + address. */
@@ -47,6 +49,11 @@ export interface ImportedKey {
     readonly delegatePubkeyhash: Uint8Array
     readonly redeemScript: Uint8Array
   }
+}
+
+/** Return/change never grants staking permission to the service again. */
+export function ordinaryKeyAddress(key: ImportedKey, network: Network): string {
+  return addressFromPubkey(key.publicKey, key.algo, network)
 }
 
 /**
@@ -111,12 +118,16 @@ async function materializeKey(stored: StoredKey, decoded: WalletWif, network: Ne
   }
 }
 
-/** The discovery source of a key wallet: one fixed address on the key's branch. */
-export function createKeyAddressSource(getKey: () => Promise<ImportedKey>): AddressSource {
+/** Fixed primary address plus the ordinary return address of a delegated WIF. */
+export function createKeyAddressSource(getKey: () => Promise<ImportedKey>, network?: Network): AddressSource {
   return {
     branches: async () => {
       const key = await getKey()
-      return [{ kind: 'list', algo: key.algo, addresses: [{ chain: 0, index: 0, address: key.address }] }]
+      return [{ kind: 'list', algo: key.algo, addresses: [
+        { chain: 0, index: 0, address: key.address },
+        ...(key.delegation !== undefined && network !== undefined
+          ? [{ chain: 1 as const, index: 0, address: ordinaryKeyAddress(key, network) }] : []),
+      ] }]
     },
     // The session owns the key cache; nothing extra to drop here.
     reset: () => undefined,
@@ -181,7 +192,7 @@ export async function inspectWifKey(wif: string, network: Network, opts?: { read
  * must match the key's algorithm; a mismatch means a programming error and is
  * refused loudly.
  */
-export async function signUnsignedTxWithKey(unsigned: UnsignedTx, key: ImportedKey, network: Network): Promise<SignedTx> {
+export async function buildSignedTransactionWithKey(unsigned: UnsignedTx, key: ImportedKey, network: Network, ordinaryOnly = false): Promise<Transaction> {
   const tx = toCryptoTransaction(unsigned)
   unsigned.inputs.forEach((input, index) => {
     if (input.algo !== key.algo) {
@@ -190,15 +201,22 @@ export async function signUnsignedTxWithKey(unsigned: UnsignedTx, key: ImportedK
   })
   let signed: Transaction
   const delegation = key.delegation
-  if (delegation === undefined) {
-    const signers: SigningInput[] = unsigned.inputs.map((_, inputIndex) => ({ inputIndex, privateKey: key.privateKey, publicKey: key.publicKey, algo: key.algo }))
+  if (delegation === undefined || ordinaryOnly) {
+    const signers: SigningInput[] = unsigned.inputs.map((input, inputIndex) => ({ input, inputIndex })).filter(({ input }) => !ordinaryOnly || input.keyScript !== 'delegated').map(({ inputIndex }) => ({ inputIndex, privateKey: key.privateKey, publicKey: key.publicKey, algo: key.algo }))
     signed = await signTransaction(tx, signers, SIGHASH.ALL, sighashCommitsTokenId(network))
   }
   else {
     const digest = sighash(tx, SIGHASH.ALL, sighashCommitsTokenId(network))
     const signature = encodeSiglistEntry(SIGHASH.ALL, key.algo, await signWithAlgorithm(digest, key.privateKey, key.algo))
-    signed = { ...tx, inputs: tx.inputs.map((input) => delegatedOwnerInput(input, signature, key.publicKey, delegation.redeemScript)) }
+    signed = { ...tx, inputs: tx.inputs.map((input, i) => unsigned.inputs[i]!.keyScript === 'ordinary'
+      ? { ...input, redeemScript: scriptP2PK(key.publicKey), siglist: [signature] }
+      : delegatedOwnerInput(input, signature, key.publicKey, delegation.redeemScript)) }
   }
+  return signed
+}
+
+export async function signUnsignedTxWithKey(unsigned: UnsignedTx, key: ImportedKey, network: Network): Promise<SignedTx> {
+  const signed = await buildSignedTransactionWithKey(unsigned, key, network)
   return { rawHex: toHex(serialize(signed)), txid: toHex(computeTxid(signed)) }
 }
 

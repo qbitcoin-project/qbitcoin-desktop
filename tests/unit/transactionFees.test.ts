@@ -4,7 +4,7 @@ import { addressFromScripthash, encodeWif } from '../../src/main/brand/crypto'
 import { SendService } from '../../src/main/wallet/SendService'
 import { buildSend, estimateSendFee, feeForDraft, InsufficientFundsError } from '../../src/main/wallet/buildTx'
 import { decodeWalletWif } from '../../src/main/wallet/keyWif'
-import { importedKeyFromWif, keyInputBytes, signUnsignedTxWithKey, type ImportedKey } from '../../src/main/wallet/keyWallet'
+import { importedKeyFromWif, keyInputBytes, ordinaryKeyAddress, signUnsignedTxWithKey, type ImportedKey } from '../../src/main/wallet/keyWallet'
 import type { GatheredUtxo } from '../../src/main/wallet/spendable'
 import { delegatedKeyFixture } from '../fixtures/delegatedKey'
 
@@ -30,8 +30,11 @@ const coin = (key: ImportedKey, n: number, value: bigint): GatheredUtxo => ({
 })
 function service(key: ImportedKey, coins: GatheredUtxo[], rate: number) {
   const sent: string[] = []
+  // Exercise covenant witness sizes too, but return change to the ordinary
+  // owner address as the wallet does; change is not another delegated output.
+  const change = ordinaryKeyAddress(key, 'mainnet')
   const svc = new SendService({ gather: async () => coins, feeRate: async () => rate, frozen: async () => new Set(),
-    getChangeAddress: async () => key.address, getPqChangeAddress: async () => key.address, advanceChange: async () => {},
+    getChangeAddress: async () => change, getPqChangeAddress: async () => change, advanceChange: async () => {},
     sign: (unsigned) => signUnsignedTxWithKey(unsigned, key, 'mainnet'),
     broadcast: async (raw) => { sent.push(raw); return 'test-txid' },
   })

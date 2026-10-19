@@ -63,3 +63,47 @@ describe('AddressService', () => {
     await expect(service.listReceiveAddresses('schnorr')).rejects.toThrow(/no Schnorr branch/)
   })
 })
+
+// Change allocations must remain discoverable from only the seed, even after
+// rejected sends and durable reservations from uncertain broadcasts.
+it.each(['ecdsa', 'falcon512'] as const)('fills %s holes and refuses to issue beyond the recoverable pending gap', async (algo) => {
+  const { deriveClassicalAddress, deriveFalconAddress } = await import('../../src/main/wallet/addresses')
+  const { discoverChain, GAP_LIMIT_CHANGE } = await import('../../src/main/wallet/discovery')
+  const { ZERO_STATS } = await import('../fixtures/staking')
+  let blob: string | null = null
+  const meta = new WalletMetaStore({ read: async () => blob, write: async (s) => { blob = s } }, { openData: async (s) => s, sealData: async (s) => s })
+  const reserved = new Set<string>(), used = new Set<string>(), mempool = new Set<string>()
+  const vault: WalletVault = { getMasterKey: async () => MASTER, on: () => () => {} }
+  const lookup = { getAddressInfo: async (address: string) => ({ address, chain: { ...ZERO_STATS, fundedTxCount: used.has(address) ? 1 : 0 }, mempool: { ...ZERO_STATS, fundedTxCount: mempool.has(address) ? 1 : 0 }, tokens: {} }) }
+  const create = () => new AddressService(vault, meta, 'testnet', 0, { lookup, reserved: async () => reserved, check: () => {} })
+  const service = create()
+  const address = () => algo === 'ecdsa' ? service.getChangeAddress() : service.getPqChangeAddress()
+  const first = await address()
+  for (let rejected = 0; rejected < 8; rejected++) {
+    await service.recordChangeAddress(algo, await address())
+    expect(await address()).toBe(first)
+  }
+  for (let pending = 0; pending < GAP_LIMIT_CHANGE; pending++) {
+    const next = await address()
+    expect(reserved.has(next)).toBe(false)
+    reserved.add(next)
+    mempool.add(next)
+    await service.recordChangeAddress(algo, next)
+  }
+  const restored = create()
+  await expect(algo === 'ecdsa' ? restored.getChangeAddress() : restored.getPqChangeAddress()).rejects.toThrow(/recoverable/)
+  // Even accepted mempool changes cannot extend the gap until they confirm.
+  mempool.clear()
+  await expect(address()).rejects.toThrow(/recoverable/)
+  reserved.delete(first)
+  expect(await address()).toBe(first)
+  used.add(first)
+  const derive = (chain: 0 | 1, index: number) => (algo === 'ecdsa' ? deriveClassicalAddress : deriveFalconAddress)(MASTER, { account: 0, chain, index, network: 'testnet' })
+  const lastPending = [...reserved].at(-1)!
+  used.add(lastPending)
+  const fromSeed = await discoverChain(derive, lookup, 1, 0, GAP_LIMIT_CHANGE)
+  expect(fromSeed.some((a) => a.address === lastPending)).toBe(true)
+  const next = await address()
+  expect(reserved.has(next)).toBe(false)
+  expect(fromSeed.some((a) => a.address === next)).toBe(true)
+})

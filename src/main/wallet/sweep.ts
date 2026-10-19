@@ -1,7 +1,7 @@
 import type { Utxo } from '@qbtc/chain'
 import type { Network } from '@qbtc/crypto'
 import { ChainService, type ChainBackend } from './ChainService'
-import { createKeyAddressSource, keyInputBytes, signUnsignedTxWithKey, type ImportedKey } from './keyWallet'
+import { createKeyAddressSource, keyInputBytes, ordinaryKeyAddress, signUnsignedTxWithKey, type ImportedKey } from './keyWallet'
 import { SendService } from './SendService'
 import { gatherFromActive, type GatheredUtxo } from './spendable'
 import { encodeDelegatePubkeyhash } from './delegation'
@@ -19,8 +19,8 @@ import type { SweepScan } from '../../shared/protocol'
 //
 // It reuses the exact send pipeline (ChainService + SendService + buildTx +
 // keyWallet signing) so a swept transaction is assembled and signed the same
-// way as any other. Change (for a partial send) returns to the key's own
-// address; a full sweep produces no change.
+// way as any other. Change returns to the key's ordinary address, including
+// for a delegated WIF; a full sweep produces no change.
 
 // The chain access a sweep needs: everything ChainService reads, plus the UTXO
 // pull for the spend pool and broadcast. The real ChainClient satisfies it.
@@ -30,12 +30,12 @@ export interface SweepBackend extends ChainBackend {
 }
 
 export interface SweepSession {
-  /** The key's single address (what's being swept from). */
+  /** The key's primary address (ordinary returns are also tracked). */
   readonly address: string
   readonly delegatePubkeyhash?: string
   /** The send driver — buildSend/maxSendable/confirmSend, same as any wallet. */
   readonly send: SendService
-  /** Confirmed + mempool balance on the key's address, as an atomic string. */
+  /** Confirmed + mempool balance on the key's tracked addresses. */
   scanBalance(): Promise<Omit<SweepScan, 'address' | 'delegatePubkeyhash'>>
   /** Wipe the key from memory. Idempotent; the session is unusable afterwards. */
   dispose(): void
@@ -44,20 +44,21 @@ export interface SweepSession {
 // Build an ephemeral sweep session around an already-materialized key. The
 // caller owns the key's lifetime only up to here — dispose() wipes it.
 export function createSweepSession(backend: SweepBackend, key: ImportedKey, network: Network): SweepSession {
-  const source = createKeyAddressSource(() => Promise.resolve(key))
+  const source = createKeyAddressSource(() => Promise.resolve(key), network)
   const chain = new ChainService(backend, source.branches)
   const inputBytes = keyInputBytes(key)
   const gather = async (): Promise<GatheredUtxo[]> => (await withMaturity(await gatherFromActive(await chain.spendableAddresses(), backend), backend, network))
-    .map((u) => inputBytes === undefined ? u : { ...u, inputBytes })
+    .map((u) => inputBytes === undefined ? u : u.address === key.address
+      ? { ...u, inputBytes, keyScript: 'delegated' as const } : { ...u, keyScript: 'ordinary' as const })
 
-  const ownAddress = (): Promise<string> => Promise.resolve(key.address)
+  const ownAddress = (): Promise<string> => Promise.resolve(ordinaryKeyAddress(key, network))
   const send = new SendService({
     gather,
     feeRate: async () => (await chain.estimateFee()).medium,
     // An ephemeral sweep has no coin-control state — nothing is frozen.
     frozen: () => Promise.resolve(new Set<string>()),
-    // No derivation: any change returns to the key's own address (address reuse
-    // is inherent to single keys); there is no index to advance.
+    // No derivation: change returns to the ordinary owner address, keeping
+    // returned funds out of delegation; there is no index to advance.
     getChangeAddress: ownAddress,
     getPqChangeAddress: ownAddress,
     advanceChange: () => Promise.resolve(),
@@ -72,7 +73,7 @@ export function createSweepSession(backend: SweepBackend, key: ImportedKey, netw
     send,
     scanBalance: async () => {
       const [summary, coins] = await Promise.all([chain.getSummary(), gather()])
-      const native = coins.filter((c) => c.tokenId === undefined)
+      const native = coins.filter((c) => c.tokenId === undefined && c.keyScript !== 'delegated')
       const maturing = native.filter((c) => c.maturityUnknown !== true && !isMature(c))
       return { balanceAtomic: summary.balanceAtomic,
         availableAtomic: native.filter((c) => isMature(c)).reduce((s, c) => s + c.value, 0n).toString(),

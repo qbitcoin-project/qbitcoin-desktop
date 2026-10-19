@@ -4,8 +4,8 @@ import { brand } from '../brand'
 import { WalletSwitcher } from '../components/WalletSwitcher'
 import { wallet } from '../lib/wallet'
 import { assetLabelFor } from '../brand/labels'
-import { hydrateFromSnapshot, loadWallets, refreshAll, useActiveWallet, useBuildNetwork } from '../lib/walletData'
-import { ActivityIcon, BoltIcon, CoinsIcon, LockIcon, ReceiveIcon, RefreshIcon, SendIcon, SettingsIcon, Sidebar, WalletIcon, type NavItem } from '../ui'
+import { hydrateFromSnapshot, loadWallets, refreshAll, useActiveWallet, useBuildNetwork, useSummary } from '../lib/walletData'
+import { Alert, ActivityIcon, BoltIcon, CoinsIcon, InfoIcon, LockIcon, ReceiveIcon, RefreshIcon, SendIcon, SettingsIcon, Sidebar, StakingIcon, WalletIcon, type NavItem } from '../ui'
 import { Activity } from './Activity'
 import { Coins } from './Coins'
 import { Convert } from './Convert'
@@ -13,11 +13,12 @@ import { Receive } from './Receive'
 import { Send } from './Send'
 import { Settings } from './Settings'
 import { WalletHome } from './WalletHome'
+import { Staking } from './Staking'
 
 // The unlocked app shell: a persistent sidebar + a content area that swaps panes.
 // Replaces the earlier full-screen-with-back-button model. `preselected` carries
 // coins chosen on the Coins pane into the Send pane.
-type Nav = 'wallet' | 'send' | 'receive' | 'convert' | 'activity' | 'coins' | 'settings'
+type Nav = 'wallet' | 'send' | 'receive' | 'convert' | 'staking' | 'activity' | 'coins' | 'settings'
 
 const NAV: NavItem[] = [
   { id: 'wallet', label: 'Wallet', icon: <WalletIcon /> },
@@ -43,6 +44,7 @@ function pageMeta(network: 'mainnet' | 'testnet' | null): Record<Nav, { title: s
     send: { title: 'Send', subtitle: `Send ${asset} to any address` },
     receive: { title: 'Receive', subtitle: 'Share your address to get paid' },
     convert: { title: 'Convert', subtitle: `Turn ${source} into ${asset}` },
+    staking: { title: 'Staking', subtitle: 'Delegate coins and manage their return' },
     activity: { title: 'Activity', subtitle: 'Every transaction on this wallet' },
     coins: { title: 'Coins', subtitle: 'Manage your unspent outputs (UTXOs)' },
     settings: { title: 'Settings', subtitle: 'Manage your wallet and security' },
@@ -57,6 +59,11 @@ export function WalletShell({ collapsed = false }: { collapsed?: boolean }) {
   // Which asset the Send pane composes. null = native coin (the sidebar/hero Send,
   // and coin-control); a token when opened from the Tokens panel.
   const [sendToken, setSendToken] = useState<TokenBalance | null>(null)
+  const { data: summary } = useSummary()
+  const [stakingFunding, setStakingFunding] = useState(false)
+  const [stakingEnabled, setStakingEnabled] = useState(false)
+  const [stakingRefresh, setStakingRefresh] = useState(0)
+  const [stakingHelp, setStakingHelp] = useState(0)
 
   // The shell mounts on unlock: paint the last-known snapshot instantly while the
   // live reads refresh in the background.
@@ -69,6 +76,12 @@ export function WalletShell({ collapsed = false }: { collapsed?: boolean }) {
   // main must confirm it for the active wallet (seed wallets only).
   const [convertEnabled, setConvertEnabled] = useState(false)
   const activeWalletId = useActiveWallet()?.id
+  useEffect(() => {
+    let alive = true
+    setStakingEnabled(false); setStakingFunding(false)
+    void wallet.stakingInfo().then((info) => { if (alive) { setStakingEnabled(info.enabled); setStakingFunding(info.enabled && info.fundingEnabled) } }).catch(() => {})
+    return () => { alive = false }
+  }, [activeWalletId])
   useEffect(() => {
     if (brand.upgrade === null) return
     let alive = true
@@ -91,10 +104,12 @@ export function WalletShell({ collapsed = false }: { collapsed?: boolean }) {
     setSendToken(null)
   }, [activeWalletId])
 
-  const navItems = convertEnabled ? [...NAV.slice(0, 3), CONVERT_NAV, ...NAV.slice(3)] : NAV
+  const navItems = [...NAV.slice(0, 3), ...(stakingEnabled ? [{ id: 'staking', label: 'Staking', icon: <StakingIcon /> }] : []),
+    ...(convertEnabled ? [CONVERT_NAV] : []), ...NAV.slice(3)]
   useEffect(() => {
     if (!convertEnabled && nav === 'convert') setNav('wallet')
-  }, [convertEnabled, nav])
+    if (!stakingEnabled && nav === 'staking') setNav('wallet')
+  }, [convertEnabled, stakingEnabled, nav])
 
   function go(to: Nav): void {
     if (to === 'receive') setReceiveAlgo('ecdsa')
@@ -109,10 +124,13 @@ export function WalletShell({ collapsed = false }: { collapsed?: boolean }) {
   let pane: ReactNode
   switch (nav) {
     case 'send':
-      pane = <Send preselected={preselected} token={sendToken} onDone={() => go('wallet')} />
+      pane = <Send onUnstake={stakingEnabled ? () => go('staking') : undefined} preselected={preselected} token={sendToken} onDone={() => go('wallet')} />
       break
     case 'receive':
       pane = <Receive key={receiveAlgo} initialAlgo={receiveAlgo} />
+      break
+    case 'staking':
+      pane = <Staking refreshKey={stakingRefresh} helpKey={stakingHelp} />
       break
     case 'convert':
       pane = <Convert />
@@ -139,6 +157,7 @@ export function WalletShell({ collapsed = false }: { collapsed?: boolean }) {
         <WalletHome
           onSend={() => go('send')}
           onReceive={() => go('receive')}
+          onStake={stakingFunding ? () => go('staking') : undefined}
           onReceiveFalcon={() => { setReceiveAlgo('falcon512'); setNav('receive') }}
           onSeeAll={() => setNav('activity')}
           onSendToken={(t) => {
@@ -173,11 +192,16 @@ export function WalletShell({ collapsed = false }: { collapsed?: boolean }) {
             <div className="content-subtitle">{meta.subtitle}</div>
           </div>
           <WalletSwitcher />
-          <button type="button" className="content-refresh" onClick={() => refreshAll()} title="Refresh">
+          {nav === 'staking' && <button type="button" className="content-refresh" onClick={() => setStakingHelp((n) => n + 1)}>
+            <InfoIcon size={16} />
+            How it works
+          </button>}
+          <button type="button" className="content-refresh" onClick={() => { refreshAll(); if (nav === 'staking') setStakingRefresh((n) => n + 1) }} title="Refresh">
             <RefreshIcon size={16} />
             Refresh
           </button>
         </header>
+        {summary?.readWarning && <Alert variant="warning">{summary.readWarning}</Alert>}
         <div key={activeWalletId ?? 'none'} style={{ flex: 1, minHeight: 0 }}>
           {pane}
         </div>

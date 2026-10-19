@@ -27,6 +27,8 @@ export type { Algo }
 export type ChangeBranch = 'ecdsa' | 'falcon512'
 
 export interface SpendableUtxo {
+  /** Imported delegated keys can also receive a return on their ordinary address. */
+  readonly keyScript?: 'ordinary' | 'delegated'
   /** Main-process estimate for an input with a non-standard redeem script. */
   readonly inputBytes?: number
   readonly txid: string
@@ -49,6 +51,7 @@ export interface SpendableTokenUtxo extends SpendableUtxo {
 }
 
 export interface UnsignedInput {
+  readonly keyScript?: 'ordinary' | 'delegated'
   readonly prevTxid: string
   readonly vout: number
   readonly valueAtomic: string
@@ -211,16 +214,20 @@ export function feeForInputs(inputs: readonly SpendableUtxo[], rate: number, out
 }
 
 /** Price the actual draft, retaining each selected input's custom witness size. */
-export function feeForDraft(pool: readonly SpendableUtxo[], unsigned: UnsignedTx, rate: number): bigint {
+export function draftSizeUpperBound(pool: readonly SpendableUtxo[], unsigned: UnsignedTx): number {
   const byOutpoint = new Map(pool.map((u) => [`${u.txid}:${u.vout}`, u]))
   const inputs = unsigned.inputs.map((i) => {
     const input = byOutpoint.get(`${i.prevTxid}:${i.vout}`)
     if (input === undefined) throw new Error('Missing input size for transaction fee.')
     return input
   })
-  return feeForInputs(inputs, rate, unsigned.outputs.map((o) => ({ value: BigInt(o.valueAtomic),
+  return transactionSizeUpperBound(inputs, unsigned.outputs.map((o) => ({ value: BigInt(o.valueAtomic),
     scripthash: fromHex(o.scripthash), ...(o.data !== undefined ? { data: fromHex(o.data) } : {}),
   })), unsigned.tokenHash !== undefined)
+}
+
+export function feeForDraft(pool: readonly SpendableUtxo[], unsigned: UnsignedTx, rate: number): bigint {
+  return feeForBytes(draftSizeUpperBound(pool, unsigned), rate)
 }
 
 // The node's canonical input order: txid hex ascending, then vout.
@@ -242,6 +249,7 @@ function toUnsignedInputs(selected: readonly SpendableUtxo[]): UnsignedInput[] {
     index: u.index,
     algo: u.algo,
     ...(u.scheme !== undefined ? { scheme: u.scheme } : {}),
+    ...(u.keyScript !== undefined ? { keyScript: u.keyScript } : {}),
   }))
   inputs.sort(compareInputs)
   return inputs
@@ -263,10 +271,12 @@ export interface BuildSendParams {
   /** Send-max: spend every input in the pool to one output and create no change.
    *  `amountAtomic` is ignored — the amount sent is the selected total minus the fee. */
   readonly sendMax?: boolean
+  /** Override change dust policy for covenant returns that must preserve the remainder. */
+  readonly dustAtomic?: bigint
 }
 
 export function buildSend(params: BuildSendParams): BuiltSend {
-  const { utxos, manualInputs, recipient, amountAtomic, feeAtomic, changeAddress, changeAddressFor, sendMax = false } = params
+  const { utxos, manualInputs, recipient, amountAtomic, feeAtomic, changeAddress, changeAddressFor, sendMax = false, dustAtomic = DUST_ATOMIC } = params
   if (feeAtomic < 0n) throw new Error('Fee cannot be negative.')
 
   const recipientScripthash = toHex(decodeAddress(recipient).scripthash)
@@ -291,7 +301,7 @@ export function buildSend(params: BuildSendParams): BuiltSend {
   if (amountAtomic <= 0n) throw new Error('Amount must be greater than zero.')
   const target = amountAtomic + feeAtomic
 
-  const selected = manualInputs !== undefined && manualInputs.length > 0 ? [...manualInputs] : selectCoins(utxos, target)
+  const selected = manualInputs !== undefined && manualInputs.length > 0 ? [...manualInputs] : selectCoins(utxos, target, dustAtomic)
   if (selected === null) {
     throw new InsufficientFundsError(target, utxos.reduce((sum, u) => sum + u.value, 0n))
   }
@@ -303,7 +313,7 @@ export function buildSend(params: BuildSendParams): BuiltSend {
   // Dust folding: a leftover at or below the dust threshold isn't worth its own
   // output (it would cost more to spend than it holds), so it goes to the fee.
   const rawChange = selectedSum - amountAtomic - feeAtomic
-  const folded = rawChange > 0n && rawChange <= DUST_ATOMIC
+  const folded = rawChange > 0n && rawChange <= dustAtomic
   const changeAtomic = folded ? 0n : rawChange
   const feePaid = folded ? feeAtomic + rawChange : feeAtomic
 

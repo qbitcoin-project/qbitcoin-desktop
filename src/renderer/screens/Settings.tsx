@@ -547,7 +547,7 @@ function BackupCard({ active }: { active: WalletInfo }) {
         action={<Button variant="secondary" size="sm" onClick={() => setRevealOpen(true)}>Reveal</Button>} />}
       {!isKey && <Row title={active.kind === 'watch' ? 'Export public data' : 'Export watch descriptor'}
         detail={active.kind === 'watch' ? 'This wallet has no private keys. Public data restores watch-only access.'
-          : 'Public data lets you follow this wallet. It cannot restore spending access.'}
+          : 'Public data follows the exported addresses. It cannot restore spending access or fixed HD staking addresses.'}
         action={<Button variant="secondary" size="sm" onClick={() => setExportOpen(true)}>Export</Button>} />}
       {revealOpen && active.kind !== 'watch' && <RevealBackupDialog active={active} onClose={() => setRevealOpen(false)} />}
       {exportOpen && <ExportPublicDialog active={active} onClose={() => setExportOpen(false)} />}
@@ -731,7 +731,7 @@ function ExportPublicDialog({ active, onClose }: { active: WalletInfo; onClose: 
       <Button variant="secondary" style={{ flex: 1 }} onClick={onClose}>Close</Button>
       <Button style={{ flex: 1 }} disabled={!data} onClick={() => void copy()}>{copied ? 'Copied' : 'Copy'}</Button>
     </>}>
-    <p className="field-hint">Public data restores watch-only access, not spending access.</p>
+    <p className="field-hint">Public data restores watch-only access, not spending access. Public descriptors do not include fixed HD staking addresses.</p>
     {data && <>
       <p className="field-hint">Network: {data.network}. Import through Add wallet → {addresses ? 'Addresses' : 'Descriptor'}.</p>
       <TextArea mono readOnly rows={5} value={data.text} aria-label={addresses ? 'Watch addresses' : 'Watch descriptor'} />

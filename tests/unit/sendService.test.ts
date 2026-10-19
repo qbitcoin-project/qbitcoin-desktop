@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ChainError } from '@qbtc/chain'
+import { ChainError, MAX_BROADCAST_BYTES } from '@qbtc/chain'
 import { SendService, type SendDeps } from '../../src/main/wallet/SendService'
 import type { GatheredUtxo } from '../../src/main/wallet/spendable'
 import type { UnsignedTx } from '../../src/main/wallet/buildTx'
+import { addressFromScripthash } from '../../src/main/brand/crypto'
 
 const RECIPIENT = 'bqhHWtW8DUJWfCvik4BgagviXbMyyNBhLnV'
 const CHANGE = 'bqaghDewzjiedo8mH7whakka5nSgRvT7Wr7'
@@ -14,7 +15,7 @@ function harness(utxos: GatheredUtxo[], frozen: ReadonlySet<string> = new Set())
     feeRate: async () => 1,
     frozen: async () => frozen,
     getChangeAddress: async () => CHANGE,
-    getPqChangeAddress: async () => CHANGE,
+    getPqChangeAddress: async () => addressFromScripthash(new Uint8Array(32).fill(3), 'mainnet'),
     advanceChange: async () => {
       calls.advance++
     },
@@ -76,6 +77,26 @@ describe('SendService', () => {
   it('rejects a selection referencing a coin that is no longer available', async () => {
     const { svc } = harness([utxo('aa', 0, 5_000_000n)])
     await expect(svc.buildSend(RECIPIENT, 1_000_000n, ['gone:0'])).rejects.toThrow(/no longer available/)
+  })
+
+  it('excludes staking coins from automatic Send, Max, manual selection and token fees', async () => {
+    const ordinary = utxo('ordinary', 0, 5000000n)
+    const delegated = { ...utxo('staking', 0, 9000000n), keyScript: 'delegated' as const }
+    const { svc, calls } = harness([ordinary, delegated, tutxo('token', 0, 100n)])
+    expect(await svc.maxSendable()).toEqual(await harness([ordinary]).svc.maxSendable())
+    await expect(svc.buildSend(RECIPIENT, 6000000n)).rejects.toThrow(/Not enough balance/)
+    await expect(svc.buildSend(RECIPIENT, 1000n, ['staking:0'])).rejects.toThrow(/Unstake/)
+    await expect(svc.maxSendable(['staking:0'])).rejects.toThrow(/Unstake/)
+    await svc.buildSend(RECIPIENT, 1000000n)
+    await svc.confirmSend()
+    expect(calls.signed[0]!.inputs.map((i) => i.prevTxid)).toEqual(['ordinary'])
+    await svc.buildTokenSend(TOKEN, RECIPIENT, 10n)
+    await svc.confirmSend()
+    expect(calls.signed[1]!.inputs.some((i) => i.prevTxid === 'staking')).toBe(false)
+    const stakedOnly = harness([delegated, tutxo('token', 0, 100n)]).svc
+    await expect(stakedOnly.buildTokenSend(TOKEN, RECIPIENT, 10n)).rejects.toThrow(/network fee/)
+    await expect(stakedOnly.maxSendable()).rejects.toThrow(/Not enough balance/)
+    await expect(harness([ordinary, { ...tutxo('staked-token', 0, 100n), keyScript: 'delegated' }]).svc.buildTokenSend(TOKEN, RECIPIENT, 10n)).rejects.toThrow(/Not enough of this token/)
   })
 
   it('clears the draft after a successful confirm', async () => {
@@ -307,4 +328,30 @@ describe('send submission recovery', () => {
     await svc.confirmSend()
     expect(calls.signed[0]!.outputs[0]!.valueAtomic).toBe('2000000')
   })
+})
+
+it('excludes reservations from automatic and manual Send without treating them as user freezes', async () => {
+  const { svc, deps } = harness([utxo('a', 0, 5000000n), utxo('b', 0, 7000000n)])
+  deps.reserved = async () => new Set(['a:0'])
+  expect(BigInt((await svc.maxSendable()).amountAtomic)).toBeLessThan(7000000n)
+  await expect(svc.buildSend(RECIPIENT, 1000000n, ['a:0'])).rejects.toThrow(/reserved by an unfinished transaction/)
+  expect(await deps.frozen()).toEqual(new Set())
+})
+
+it('rejects oversized Send before signing and guards the final signed wire size', async () => {
+  const { svc, calls, deps } = harness(Array.from({ length: 1600 }, (_, vout) => ({ ...utxo('aa', vout, 1000000n), algo: 'falcon512' as const })))
+  await expect(svc.buildSend(RECIPIENT, 0n, undefined, true)).rejects.toThrow(/2 MiB/)
+  expect(calls.sign).toBe(0)
+  await svc.buildSend(RECIPIENT, 100000n)
+  deps.sign = async () => ({ rawHex: '00'.repeat(MAX_BROADCAST_BYTES + 1), txid: 'oversized' })
+  await expect(svc.confirmSend()).rejects.toThrow(/2 MiB/)
+  expect(calls.broadcast).toEqual([])
+})
+
+it('allows a Send preview with 80 Falcon inputs above the former 100 KB limit', async () => {
+  const { svc, calls } = harness(Array.from({ length: 80 }, (_, vout) => ({ ...utxo('aa', vout, 1000000n), algo: 'falcon512' as const })))
+  const preview = await svc.buildSend(RECIPIENT, 0n, undefined, true)
+  expect(preview).toMatchObject({ totalAtomic: '80000000', changeAtomic: '0', signature: 'Falcon-512' })
+  expect(BigInt(preview.feeAtomic)).toBeGreaterThan(100000n)
+  expect(calls.sign).toBe(0)
 })

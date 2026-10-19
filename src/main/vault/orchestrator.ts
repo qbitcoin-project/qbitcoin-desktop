@@ -37,6 +37,19 @@ import {
   type WalletSummary,
   type WatchInput,
 } from '../../shared/protocol'
+import type { StakingFundingRequest, StakingWithdrawalRequest, StakingInfo, StakingPreview, StakingResult, StakingSnapshot } from '../../shared/staking'
+
+export interface StakingOps {
+  info(): Promise<StakingInfo>
+  list(): Promise<StakingSnapshot>
+  refresh(): Promise<StakingSnapshot>
+  buildFunding(request: StakingFundingRequest): Promise<StakingPreview>
+  buildWithdrawal(request: StakingWithdrawalRequest): Promise<StakingPreview>
+  confirm(id: string): Promise<StakingResult>
+  retry(id: string): Promise<StakingResult>
+  buildRecovery(id: string): Promise<StakingPreview>
+  setAutoRetry(id: string, enabled: boolean): Promise<void>
+}
 
 // The minimal surface the orchestrator needs from the Vault (the real Vault
 // satisfies it). Keeping it an interface keeps the orchestrator pure — no
@@ -180,6 +193,7 @@ export interface OrchestratorDeps {
   readonly node: NodeOps
   readonly upgrade: UpgradeOps
   readonly downgrade: DowngradeOps
+  readonly staking?: StakingOps
 }
 
 // Handles every wallet request from the renderer. Vault-lifecycle requests are
@@ -339,6 +353,44 @@ export class VaultOrchestrator {
           return ok(await this.deps.downgrade.convert(request.amountAtomic, request.btcAddress))
         case 'downgrade.reclaim':
           return ok(await this.deps.downgrade.reclaim(request.freezeTxid))
+        case 'staking.info':
+        case 'staking.list':
+        case 'staking.refresh':
+        case 'staking.buildFunding':
+        case 'staking.buildWithdrawal':
+        case 'staking.confirm':
+        case 'staking.buildRecovery':
+        case 'staking.setAutoRetry':
+        case 'staking.retry': {
+          if (await this.deps.vault.getStatus() !== 'unlocked') throw new Error('Unlock the wallet to use staking.')
+          const staking = this.deps.staking
+          if (staking === undefined) throw new Error('Staking is not available.')
+          if (request.type === 'staking.info') return ok(await staking.info())
+          if (request.type === 'staking.list') return ok(await staking.list())
+          if (request.type === 'staking.refresh') return ok(await staking.refresh())
+          if (request.type === 'staking.buildFunding') {
+            const r = request.request
+            if (r === null || typeof r !== 'object' || !['ecdsa', 'falcon512'].includes(r.algo) || typeof r.amountAtomic !== 'string' ||
+              (r.max !== undefined && typeof r.max !== 'boolean') || (r.sourceAddress !== undefined && typeof r.sourceAddress !== 'string')) throw new Error('Invalid staking request.')
+            return ok(await staking.buildFunding(r))
+          }
+          if (request.type === 'staking.buildWithdrawal') {
+            const r = request.request
+            if (r === null || typeof r !== 'object' || typeof r.address !== 'string' || r.address.length > 160 ||
+              (r.tokenId !== undefined && (typeof r.tokenId !== 'string' || !/^[0-9a-f]{64}$/.test(r.tokenId))) ||
+              typeof r.amountAtomic !== 'string' || (r.max !== undefined && typeof r.max !== 'boolean')) throw new Error('Invalid unstake request.')
+            return ok(await staking.buildWithdrawal(r))
+          }
+          const id = request.type === 'staking.confirm' ? request.draftId : request.operationId
+          if (typeof id !== 'string' || id.length > 100) throw new Error('Invalid staking operation.')
+          if (request.type === 'staking.buildRecovery') return ok(await staking.buildRecovery(id))
+          if (request.type === 'staking.setAutoRetry') {
+            if (typeof request.enabled !== 'boolean') throw new Error('Invalid retry setting.')
+            await staking.setAutoRetry(id, request.enabled)
+            return ok(undefined)
+          }
+          return ok(await (request.type === 'staking.confirm' ? staking.confirm(id) : staking.retry(id)))
+        }
         default:
           return fail(new Error(`Unknown request: ${String((request as { type: unknown }).type)}`))
       }
