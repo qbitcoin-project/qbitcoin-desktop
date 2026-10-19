@@ -1,0 +1,7 @@
+{
+  "id": "published-chain-dependency",
+  "scope": "shared",
+  "type": "internal",
+  "bump": "none",
+  "text": "Update the chain SDK to 1.2.0, which exports the node's 2 MiB transaction size limit."
+}
