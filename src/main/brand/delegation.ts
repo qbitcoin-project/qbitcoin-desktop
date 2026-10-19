@@ -22,9 +22,11 @@ export interface StakingDerivation {
 
 // BRAND FILE: immutable recovery paths. Never edit a shipped entry; retain
 // old shipped entries when adding a new active version. Staking uses branch 2
-// in each account. None is listed yet: seed wallets get no staking
-// owner keys until a brand adds its derivation.
-export const STAKING_DERIVATIONS: readonly StakingDerivation[] = []
+// in each account.
+export const STAKING_DERIVATIONS: readonly StakingDerivation[] = [{
+  id: 'staking-owner-v2', schemeId: 'qbt-v1-slip44',
+  coinType: { mainnet: 2009, testnet: 1 }, falconHdInfo: 'qbt/pq/falcon512/v1', active: true,
+}]
 
 export interface DelegateProfile {
   readonly id: string
@@ -38,6 +40,19 @@ export interface DelegateProfile {
   readonly fundingEnabled: boolean
 }
 
-// BRAND FILE: public service identifiers, not payment addresses. No staking
-// service is configured yet, so delegation funding stays unavailable.
-export const DELEGATE_PROFILES: readonly DelegateProfile[] = []
+// BRAND FILE: public service identifiers, not payment addresses. Funding is
+// open on both networks. The testnet minimum was confirmed with the service;
+// mainnet uses the node's default registration minimum, shown as unconfirmed
+// until the service confirms its own.
+export const DELEGATE_PROFILES: readonly DelegateProfile[] = [
+  {
+    id: 'qbt-testnet-service-v1', label: 'QBitcoin staking service', network: 'testnet',
+    hashes: { ecdsa: '2vtxEqTSm1kacvSys13JyNBJLJfxNijDRxWy', falcon512: 'AKZRT5sqJx9eQJTW6mD1Toi7TojxPorMorjnHoaN5iZCSeh8NH9R' },
+    status: 'active', minimumAtomic: '100000', minimumVerified: true, fundingEnabled: true,
+  },
+  {
+    id: 'qbt-mainnet-service-v1', label: 'QBitcoin staking service', network: 'mainnet',
+    hashes: { ecdsa: '2CNozvhUpk5zxsnXS6PtoMcKPu3gjxcFPNy6', falcon512: '6nA5bL9H8FZA1HbV1PK73QZhCjBBMBZxJFrrLb9sUdWAgXPok9rv' },
+    status: 'active', minimumAtomic: '100000000', minimumVerified: false, fundingEnabled: true,
+  },
+]
