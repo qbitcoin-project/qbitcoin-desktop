@@ -12,7 +12,10 @@ import { buildAppMenu } from './menu'
 import { createWalletCore } from './vault'
 import { configureFalconWasm } from './wallet/falconWasm'
 import { initAutoUpdater } from './updater'
+import { configureTestStorage } from './testBuild'
 import { isAppNavigation, isSafeExternalUrl, isTrustedRendererDocument, rendererDevUrl as getRendererDevUrl } from './windowSecurity'
+
+configureTestStorage(app)
 
 // electron-vite sets this only while running `dev` (renderer served with HMR).
 const rendererDevUrl = getRendererDevUrl(app.isPackaged, process.env['ELECTRON_RENDERER_URL'])

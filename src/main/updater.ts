@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { UPDATE_EVENT_CHANNEL, UPDATE_INSTALL_CHANNEL, type UpdateEvent } from '../shared/protocol'
 import { PRODUCT_NAME } from './appInfo'
+import { TEST_BUILD } from './testBuild'
 
 // Auto-update via electron-updater against the generic HTTPS feed configured in
 // electron-builder.yml (publish: generic → the brand's download URL).
@@ -21,10 +22,9 @@ function broadcast(event: UpdateEvent): void {
 }
 
 export function initAutoUpdater(): void {
-  // The renderer may ask to install even in dev (no-op there); register always.
+  // Test builds never register an install handler or contact the stable feed.
+  if (TEST_BUILD || !app.isPackaged) return
   ipcMain.on(UPDATE_INSTALL_CHANNEL, () => autoUpdater.quitAndInstall())
-
-  if (!app.isPackaged) return
 
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
@@ -45,6 +45,16 @@ export function initAutoUpdater(): void {
  * the in-app banner (broadcast above) offers the restart.
  */
 export async function checkForUpdatesInteractive(): Promise<void> {
+  if (TEST_BUILD) {
+    await dialog.showMessageBox({
+      type: 'info',
+      title: PRODUCT_NAME,
+      message: 'Updates are disabled in this test build.',
+      detail: 'Install the next test build manually. Your test wallet data will be preserved.',
+      buttons: ['OK'],
+    })
+    return
+  }
   if (!app.isPackaged) {
     await dialog.showMessageBox({
       type: 'info',

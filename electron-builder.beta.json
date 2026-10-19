@@ -1,0 +1,32 @@
+{
+  "extends": null,
+  "appId": "org.qbitcoin.wallet.desktop.test",
+  "productName": "QBitcoin Wallet Test",
+  "copyright": "Copyright © 2026 QBitcoin",
+  "publish": null,
+  "forceCodeSigning": true,
+  "directories": {
+    "output": "release/beta",
+    "buildResources": "resources"
+  },
+  "extraMetadata": {
+    "name": "qbitcoin-wallet-desktop-test",
+    "productName": "QBitcoin Wallet Test",
+    "version": "1.6.0-beta.3",
+    "main": "./dist/beta-app/main/index.js"
+  },
+  "files": ["dist/beta-app/**/*", "package.json"],
+  "mac": {
+    "target": [
+      { "target": "dmg", "arch": ["arm64"] },
+      { "target": "zip", "arch": ["arm64"] }
+    ],
+    "category": "public.app-category.finance",
+    "artifactName": "QBitcoin-Wallet-Test-${version}-${arch}.${ext}",
+    "hardenedRuntime": true,
+    "gatekeeperAssess": false,
+    "entitlements": "resources/entitlements.mac.plist",
+    "entitlementsInherit": "resources/entitlements.mac.plist",
+    "notarize": true
+  }
+}

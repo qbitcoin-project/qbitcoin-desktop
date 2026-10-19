@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-19",
+  "blocks": [
+    { "kind": "paragraph", "text": "This test build uses separate wallet storage, starts on testnet on first launch, and does not check for or install updates. Install subsequent test builds manually." },
+    { "kind": "heading", "text": "Delegated staking" },
+    { "kind": "list", "items": [
+      "Delegate ordinary coins with a dedicated ECDSA or Falcon owner key. Registration is submitted through the blockchain, without a separate service API.",
+      "Track staking balances and operations. Unstake a chosen amount or use Max; the remainder stays delegated. Send spends only ordinary coins.",
+      "Recover uncertain submissions with explicit recovery transfers and continue observing conflicts after chain reorganizations.",
+      "Deposits start at 1 coin on mainnet and at 0.001 coins on testnet, subject to service acceptance.",
+      "The published chain SDK supports transactions up to 2 MiB. Larger staking maximum transfers are split into separately reviewed parts."
+    ] }
+  ]
+}

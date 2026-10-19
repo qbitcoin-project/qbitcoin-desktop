@@ -6,8 +6,10 @@
 // installs must keep that path byte-stable (installed wallets would
 // "disappear" otherwise). These constants are presentation only.
 
+import { TEST_BUILD } from './testBuild'
+
 /** Human-readable product name for menu items and dialogs. */
-export const PRODUCT_NAME = 'QBitcoin Wallet'
+export const PRODUCT_NAME = TEST_BUILD?.productName ?? 'QBitcoin Wallet'
 
 /** Brand website for Help → Learn More; null hides the item. */
 export const HOMEPAGE: string | null = null

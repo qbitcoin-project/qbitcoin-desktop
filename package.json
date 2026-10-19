@@ -27,6 +27,8 @@
     "dist:win": "electron-vite build && electron-builder --win",
     "dist:linux": "electron-vite build && electron-builder --linux",
     "dist:mac:test": "electron-vite build && electron-builder --mac --config electron-builder.test.yml",
+    "build:mac:beta": "node build/build-mac-beta.mjs --prepare-only",
+    "dist:mac:beta": "node build/build-mac-beta.mjs --distribute",
     "changes:add": "node build/release.mjs add",
     "release:preview": "node build/release.mjs preview",
     "release:prepare": "node build/release.mjs prepare",

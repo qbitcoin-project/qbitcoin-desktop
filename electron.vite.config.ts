@@ -6,6 +6,10 @@ import type { Plugin } from 'vite'
 import { PRODUCTION_CSP } from './src/shared/csp'
 import { parseChangelog } from './src/shared/changelog'
 import { version } from './package.json'
+import { loadBetaProfile } from './build/mac-beta.mjs'
+
+const beta = process.env.WALLET_TEST_BUILD === '1' ? loadBetaProfile(__dirname) : null
+const changelog = parseChangelog(readFileSync(resolve(__dirname, 'CHANGELOG.md'), 'utf8'))
 
 // Bake the production CSP into the built index.html as a <meta> tag — the form
 // Electron documents for file://-loaded pages, where response headers don't
@@ -35,6 +39,7 @@ function injectCspMeta(): Plugin {
 // normal Vite + React app. The vault and crypto live in `main`.
 export default defineConfig({
   main: {
+    define: { __TEST_BUILD__: JSON.stringify(beta?.identity ?? null) },
     // Bundle the @qbtc/* packages into main rather than externalizing them:
     // they are pure ESM (the main bundle is CJS), bundling keeps a single copy
     // of @qbtc/crypto shared by the vault and our own code (so its error
@@ -43,22 +48,25 @@ export default defineConfig({
     // .wasm itself is located). Real npm deps stay external.
     plugins: [externalizeDepsPlugin({ exclude: ['@qbtc/crypto', '@qbtc/chain', '@qbtc/vault'] })],
     build: {
+      ...(beta ? { outDir: resolve(__dirname, 'dist/beta-app/main') } : {}),
       rollupOptions: { input: { index: resolve(__dirname, 'src/main/index.ts') } },
     },
   },
   preload: {
     plugins: [externalizeDepsPlugin()],
     build: {
+      ...(beta ? { outDir: resolve(__dirname, 'dist/beta-app/preload') } : {}),
       rollupOptions: { input: { index: resolve(__dirname, 'src/preload/index.ts') } },
     },
   },
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
     define: {
-      __APP_VERSION__: JSON.stringify(version),
-      __CHANGELOG__: JSON.stringify(parseChangelog(readFileSync(resolve(__dirname, 'CHANGELOG.md'), 'utf8'))),
+      __APP_VERSION__: JSON.stringify(beta?.version ?? version),
+      __CHANGELOG__: JSON.stringify(beta ? [beta.notes, ...changelog] : changelog),
     },
     build: {
+      ...(beta ? { outDir: resolve(__dirname, 'dist/beta-app/renderer') } : {}),
       rollupOptions: { input: { index: resolve(__dirname, 'src/renderer/index.html') } },
       assetsInlineLimit: 0,
     },
