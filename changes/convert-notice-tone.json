@@ -3,5 +3,5 @@
   "scope": "shared",
   "type": "changed",
   "bump": "patch",
-  "text": "Convert notes read as information rather than warnings: an information icon replaces the warning triangle, the conversion form states what you receive, the protocol fee and the expected time, and the reverse conversion review explains when it can no longer be cancelled."
+  "text": "Convert displays clearer information about the amount you receive, protocol fees, timing and when a reverse conversion can no longer be cancelled."
 }

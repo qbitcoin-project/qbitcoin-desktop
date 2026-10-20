@@ -57,7 +57,7 @@ for (const algo of ['ecdsa', 'falcon512'] as const) {
       await expect(page.getByText(`Owner: ${algo === 'ecdsa' ? 'ECDSA' : 'Falcon-512'}`, { exact: true })).toBeVisible()
       await page.getByLabel('Primary').getByRole('button', { name: 'Send', exact: true }).click()
       await expect(page.getByText('Delegated staking', { exact: true })).toBeVisible()
-      await expect(page.getByText(/Send uses only ordinary coins/)).toBeVisible()
+      await expect(page.getByRole('status').getByText(/Send uses only ordinary coins/)).toBeVisible()
       await page.getByRole('button', { name: 'Lock wallet', exact: true }).click()
       await expect(page.getByRole('button', { name: 'Unlock', exact: true })).toBeVisible()
       // Unlock in the same process must create a fresh imported-key session.
