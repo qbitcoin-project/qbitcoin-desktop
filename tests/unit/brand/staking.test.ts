@@ -162,8 +162,8 @@ describe('fixed staking recovery policy', () => {
       }
     } finally { master.wipePrivateData() }
   })
-  it('opens mainnet funding with the unconfirmed default minimum and keeps the confirmed testnet minimum', () => {
-    expect(DELEGATE_PROFILES.find((p) => p.network === 'mainnet')).toMatchObject({ minimumAtomic: '100000000', fundingEnabled: true, minimumVerified: false })
+  it('uses the confirmed 0.001 minimum for mainnet and testnet funding', () => {
+    expect(DELEGATE_PROFILES.find((p) => p.network === 'mainnet')).toMatchObject({ minimumAtomic: '100000', fundingEnabled: true, minimumVerified: true })
     expect(DELEGATE_PROFILES.find((p) => p.network === 'mainnet')?.commission).toBeUndefined()
     expect(DELEGATE_PROFILES.find((p) => p.network === 'testnet')).toMatchObject({ minimumAtomic: '100000', fundingEnabled: true, minimumVerified: true })
   })

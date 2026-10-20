@@ -1,1 +1,30 @@
-null
+{
+  "version": "1.6.0",
+  "date": "2026-10-20",
+  "tag": "qbtc-v1.6.0",
+  "origin": "notes",
+  "changes": [
+    {
+      "id": "convert-notice-tone",
+      "hash": "482cd4eb1b940ffe94881cd0592e452968ccdcb389eef7dc3caede8e9a6165ca"
+    },
+    {
+      "id": "delegated-staking",
+      "hash": "0eccea6b84d5d5104be931cf852c64db34a1ad343b6c45309fb5b199c9bd72d9"
+    },
+    {
+      "id": "isolated-macos-test-build",
+      "hash": "b375796162554f4e4521957056042ebd3fd6d82d1bc1353d225f98407e46f875"
+    },
+    {
+      "id": "published-chain-dependency",
+      "hash": "e498f17c7b3e38d5af3e82ecc559b12a9cd3630d3dbd7f0db80eca9a853af16b"
+    },
+    {
+      "id": "staking-service",
+      "hash": "08fac7651ab257c2668970accce2e6a89ff7eff2ba3cdb56651212150f1687ec"
+    }
+  ],
+  "body": "### Added\n\n- Manage delegated coins in the new Staking page, including coins controlled by imported delegated keys. See available, locked and pending balances, unlocking times and the latest reward. Unstake a chosen amount or the available maximum while keeping the remainder delegated, and return tokens to an ordinary wallet address. Activity combines local operations with confirmed transactions found in the blockchain, distinguishes rewards from restaked coins, and shows five entries at a time with Show more. Send uses only ordinary coins and directs you to unstake first when those funds are insufficient. Review and confirm staking transfers in separate dialogs that retain entered amounts when closed. Pending operations reserve their coins, support pausing retries and offer a separately reviewed recovery transfer; conflicts are checked again after chain reorganizations. Large Falcon transactions are supported up to 2 MiB, with Max splitting larger staking transfers into separately reviewed parts. Sending requests change addresses only when needed.\n- Delegate coins to the QBitcoin staking service with dedicated ECDSA or Falcon-512 keys within each account. Start in Staking, review the transfer and register through the blockchain without a separate service API. The wallet accepts deposits from 0.001 QBTC on mainnet and 0.001 tQBTC on testnet; acceptance by the staking service is separate from transaction confirmation.\n\n### Changed\n\n- Convert displays clearer information about the amount you receive, protocol fees, timing and when a reverse conversion can no longer be cancelled.",
+  "sourceDigest": "7c2ddb860846a37523c79198e69aa504f9689eae723b482bb195033947e2cd89"
+}

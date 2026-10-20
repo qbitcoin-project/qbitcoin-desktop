@@ -1,6 +1,6 @@
 {
   "id": "isolated-macos-test-build",
-  "scope": "shared",
+  "scope": "qbitcoin",
   "type": "internal",
   "bump": "none",
   "text": "Add a separate Apple Silicon macOS test distribution workflow with isolated storage, disabled updates, and explicit signing and notarization requirements."

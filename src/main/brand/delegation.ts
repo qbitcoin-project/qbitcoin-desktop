@@ -41,9 +41,7 @@ export interface DelegateProfile {
 }
 
 // BRAND FILE: public service identifiers, not payment addresses. Funding is
-// open on both networks. The testnet minimum was confirmed with the service;
-// mainnet uses the node's default registration minimum, shown as unconfirmed
-// until the service confirms its own.
+// open on both networks, with a confirmed minimum of 0.001 coins per deposit.
 export const DELEGATE_PROFILES: readonly DelegateProfile[] = [
   {
     id: 'qbt-testnet-service-v1', label: 'QBitcoin staking service', network: 'testnet',
@@ -53,6 +51,6 @@ export const DELEGATE_PROFILES: readonly DelegateProfile[] = [
   {
     id: 'qbt-mainnet-service-v1', label: 'QBitcoin staking service', network: 'mainnet',
     hashes: { ecdsa: '2CNozvhUpk5zxsnXS6PtoMcKPu3gjxcFPNy6', falcon512: '6nA5bL9H8FZA1HbV1PK73QZhCjBBMBZxJFrrLb9sUdWAgXPok9rv' },
-    status: 'active', minimumAtomic: '100000000', minimumVerified: false, fundingEnabled: true,
+    status: 'active', minimumAtomic: '100000', minimumVerified: true, fundingEnabled: true,
   },
 ]

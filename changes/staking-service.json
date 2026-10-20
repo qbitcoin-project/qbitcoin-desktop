@@ -3,5 +3,5 @@
   "scope": "qbitcoin",
   "type": "added",
   "bump": "minor",
-  "text": "Delegate coins to the QBitcoin staking service with dedicated ECDSA or Falcon owner keys within your account and register through the blockchain. Delegation starts in Staking and runs in its own dialog through amount, review and result steps, using the wallet’s ordinary spendable coins and requesting a change address only when needed. Deposits start at 1 coin on mainnet and at 0.001 coins on testnet, subject to service acceptance."
+  "text": "Delegate coins to the QBitcoin staking service with dedicated ECDSA or Falcon-512 keys within each account. Start in Staking, review the transfer and register through the blockchain without a separate service API. The wallet accepts deposits from 0.001 QBTC on mainnet and 0.001 tQBTC on testnet; acceptance by the staking service is separate from transaction confirmation."
 }

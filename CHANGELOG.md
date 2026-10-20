@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.6.0 — 2026-10-20
+
+### Added
+
+- Manage delegated coins in the new Staking page, including coins controlled by imported delegated keys. See available, locked and pending balances, unlocking times and the latest reward. Unstake a chosen amount or the available maximum while keeping the remainder delegated, and return tokens to an ordinary wallet address. Activity combines local operations with confirmed transactions found in the blockchain, distinguishes rewards from restaked coins, and shows five entries at a time with Show more. Send uses only ordinary coins and directs you to unstake first when those funds are insufficient. Review and confirm staking transfers in separate dialogs that retain entered amounts when closed. Pending operations reserve their coins, support pausing retries and offer a separately reviewed recovery transfer; conflicts are checked again after chain reorganizations. Large Falcon transactions are supported up to 2 MiB, with Max splitting larger staking transfers into separately reviewed parts. Sending requests change addresses only when needed.
+- Delegate coins to the QBitcoin staking service with dedicated ECDSA or Falcon-512 keys within each account. Start in Staking, review the transfer and register through the blockchain without a separate service API. The wallet accepts deposits from 0.001 QBTC on mainnet and 0.001 tQBTC on testnet; acceptance by the staking service is separate from transaction confirmation.
+
+### Changed
+
+- Convert displays clearer information about the amount you receive, protocol fees, timing and when a reverse conversion can no longer be cancelled.
+
 ## 1.5.0 — 2026-10-14
 
 ### Added
