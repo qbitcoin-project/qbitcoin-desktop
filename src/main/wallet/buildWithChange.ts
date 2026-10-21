@@ -1,5 +1,5 @@
 import { toHex } from '@qbtc/crypto'
-import { addressFromScripthash, decodeAddress } from '../brand/crypto'
+import { addressFromScripthash, decodeAddress } from '../crypto'
 import type { ChangeBranch, UnsignedTx } from './buildTx'
 
 /** Price and select inputs before requesting wallet addresses. These builders

@@ -1,6 +1,6 @@
 import { deserialize, fromHex, masterKeyFromSeed, mnemonicToSeed, toHex } from '@qbtc/crypto'
 import { describe, expect, it, vi } from 'vitest'
-import { addressFromPubkey, addressFromScripthash, decodeAddress } from '../../src/main/brand/crypto'
+import { addressFromPubkey, addressFromScripthash, decodeAddress } from '../../src/main/crypto'
 import { AddressService } from '../../src/main/wallet/AddressService'
 import { WalletMetaStore } from '../../src/main/wallet/meta'
 import { GAP_LIMIT_CHANGE } from '../../src/main/wallet/discovery'

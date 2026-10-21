@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { brand } from '../../src/renderer/brand'
-import { addressPlaceholderFor, assetLabelFor } from '../../src/renderer/brand/labels'
+import { addressPlaceholderFor, assetLabelFor } from '../../src/renderer/lib/brandLabels'
 
-// The per-network brand strings. A brand overrides the VALUES; what is
+// The per-network brand strings. Each brand sets its own VALUES; what is
 // pinned here is the shape and the reading rule, which every brand shares.
 describe('per-network brand labels', () => {
   it('reads the label of the requested network', () => {

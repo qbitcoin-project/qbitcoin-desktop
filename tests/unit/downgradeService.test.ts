@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ChainTx, Outspend } from '@qbtc/chain'
 import { deserialize, downgradeScript, federationFreezeScript, federationScripthash, freezeScript, fromHex, getPublicKey, hash256, reclaimScripthash, serialize, toHex, TX_TYPE_STANDARD, type Transaction } from '@qbtc/crypto'
-import { addressFromScripthash } from '../../src/main/brand/crypto'
+import { addressFromScripthash } from '../../src/main/crypto'
 import {
   DowngradeService,
   estimateBtcForDowngrade,

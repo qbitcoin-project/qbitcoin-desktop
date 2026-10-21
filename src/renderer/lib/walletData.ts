@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react'
 import type { Contact, HistoryItem, HistoryPage, NodeStatus, TokenBalance, TxDetail, UtxoView, WalletInfo, WalletSnapshot, WalletSummary } from '../../shared/protocol'
-import { addressPlaceholderFor, assetLabelFor } from '../brand/labels'
+import { addressPlaceholderFor, assetLabelFor } from './brandLabels'
 import { wallet } from './wallet'
 
 // Stale-while-revalidate cache for the wallet's read models. Screens read through
@@ -221,7 +221,7 @@ export function networkLabel(network: 'mainnet' | 'testnet' | null): string {
 // ─── Per-network brand strings ───────────────────────────────────────
 // The ticker and the address hint depend on which chain this build runs on;
 // these hooks re-render with the right value once main reports the network
-// (see brand/labels for the pure readers and the mainnet fallback).
+// (see lib/brandLabels for the pure readers and the mainnet fallback).
 
 /** The build's ticker for native amounts, e.g. "QBT" / "tQBT". */
 export function useAssetLabel(): string {

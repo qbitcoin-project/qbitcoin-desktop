@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { _electron as electron, expect, test, type Page } from '@playwright/test'
 import { falcon512KeygenFromSeed, getPublicKey, schnorrGetPublicKey } from '@qbtc/crypto'
-import { addressFromPubkey, encodeWif } from '../../src/main/brand/crypto'
+import { addressFromPubkey, encodeWif } from '../../src/main/crypto'
 import { acceptPrivacy, focusApp, focusedWindow, freshUserData } from './privacyHelpers'
 import type { BridgeApi } from '../../src/shared/bridge'
 import type { WalletApi } from '../../src/shared/protocol'

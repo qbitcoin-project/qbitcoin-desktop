@@ -1,5 +1,5 @@
 import { encodeSiglistEntry, serialize, sighash, SIGHASH, signWithAlgorithm, toHex, txid, type Network, type Transaction } from '@qbtc/crypto'
-import { decodeAddress, sighashCommitsTokenId } from '../brand/crypto'
+import { decodeAddress, sighashCommitsTokenId } from '../crypto'
 import type { StakingOwnerAlgo } from '../../shared/staking'
 import { buildSend, draftSizeUpperBound, feeForDraft, type BuiltSend, type SpendableUtxo, type UnsignedTx, type ChangeBranch } from './buildTx'
 import { delegatedOwnerInput, delegationMark, delegationScript } from './delegation'

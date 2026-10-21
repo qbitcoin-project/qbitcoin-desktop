@@ -1,0 +1,7 @@
+{
+  "id": "brand-folder-values",
+  "scope": "shared",
+  "type": "internal",
+  "bump": "none",
+  "text": "Keep only brand values and artwork in brand folders; shared types, the crypto facade and label readers move to shared modules."
+}

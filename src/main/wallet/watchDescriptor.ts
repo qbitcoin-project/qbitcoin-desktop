@@ -9,7 +9,7 @@ import {
   decodeAddress,
   META_V1_SCHEME_ID,
   validateAddress,
-} from '../brand/crypto'
+} from '../crypto'
 import { deriveFalconAddress } from './addresses'
 import { indicesFor, type WalletMeta } from './meta'
 

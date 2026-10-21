@@ -1,5 +1,5 @@
 import { decodeBase58Check, encodeBase58Check, hash160, hash256, opPushdata, type Algorithm, type Network, type TxInput } from '@qbtc/crypto'
-import { addressFromScripthash } from '../brand/crypto'
+import { addressFromScripthash } from '../crypto'
 import { DELEGATION } from '../brand/delegation'
 
 const concat = (...parts: Uint8Array[]): Uint8Array => Uint8Array.from(parts.flatMap((p) => [...p]))

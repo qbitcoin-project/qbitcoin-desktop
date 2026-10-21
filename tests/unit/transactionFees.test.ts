@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { deserialize, fromHex, setSchnorrEnabled } from '@qbtc/crypto'
-import { addressFromScripthash, encodeWif } from '../../src/main/brand/crypto'
+import { addressFromScripthash, encodeWif } from '../../src/main/crypto'
 import { SendService } from '../../src/main/wallet/SendService'
 import { buildSend, estimateSendFee, feeForDraft, InsufficientFundsError } from '../../src/main/wallet/buildTx'
 import { decodeWalletWif } from '../../src/main/wallet/keyWif'

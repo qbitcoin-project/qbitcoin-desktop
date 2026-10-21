@@ -1,5 +1,5 @@
 import { isValidAccountXpub, type Network } from '@qbtc/crypto'
-import { activeScheme, validateAddress } from '../brand/crypto'
+import { activeScheme, validateAddress } from '../crypto'
 import type { WatchInput } from '../../shared/protocol'
 import { createAddressListSource, createDescriptorAddressSource, type AddressSource } from './AddressSource'
 import type { BlobStore, Sealer } from './meta'

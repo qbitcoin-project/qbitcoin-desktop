@@ -19,7 +19,7 @@ import {
 import {
   addressFromPubkey,
   sighashCommitsTokenId,
-} from '../brand/crypto'
+} from '../crypto'
 import type { AddressOps } from '../vault/orchestrator'
 import type { AddressSource } from './AddressSource'
 import type { UnsignedTx } from './buildTx'

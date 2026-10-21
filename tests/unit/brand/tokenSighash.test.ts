@@ -1,5 +1,6 @@
+// BRAND FILE: pins this brand's token-id sighash schedule.
 import { describe, expect, it } from 'vitest'
-import { sighashCommitsTokenId } from '../../../src/main/brand/crypto'
+import { sighashCommitsTokenId } from '../../../src/main/crypto'
 import { PROFILE } from '../../../src/main/brand/profile'
 
 // QBitcoin's node commits the token id in its transaction sign data from

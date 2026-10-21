@@ -33,12 +33,12 @@ import {
   signedMessagePreimage,
   UPGRADE,
   validateAddress,
-} from '../../../src/main/brand/crypto'
+} from '../../../src/main/crypto'
 import { PROFILE } from '../../../src/main/brand/profile'
 
-// Pins of this build's chain profile and of the facade bound to it. BRAND
-// TEST: each brand replaces the expected values in its brand files — the
-// assertions keep their shape. On a shipped brand a failing pin means someone
+// BRAND FILE: pins of this build's chain profile and of the facade bound to
+// it. Each brand keeps its own copy of this file with its own expected values -
+// the assertions keep their shape. On a shipped brand a failing pin means someone
 // touched a frozen value: fix the profile, never the pin.
 
 const NETWORKS: readonly Network[] = ['mainnet', 'testnet']

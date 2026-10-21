@@ -1,3 +1,4 @@
+// BRAND FILE: this brand's mark. Each brand keeps its own artwork here.
 import { useId } from 'react'
 
 // The QBitcoin mark: a chat-bubble "Q" carrying a Bitcoin B between brackets.

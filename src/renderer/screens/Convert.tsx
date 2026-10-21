@@ -7,7 +7,7 @@ import { UpgradeConversionRow } from '../components/UpgradeConversionRow'
 import { formatToken } from '../lib/format'
 import { wallet } from '../lib/wallet'
 import { validateAmount } from '../lib/amountValidation'
-import { assetLabelFor } from '../brand/labels'
+import { assetLabelFor } from '../lib/brandLabels'
 import { useAddressPlaceholder, useBuildNetwork, useCoins } from '../lib/walletData'
 import { Alert, Button, CheckIcon, CopyIcon, CopyValue, Screen, Segmented, TextField } from '../ui'
 

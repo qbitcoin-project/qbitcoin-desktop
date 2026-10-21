@@ -1,7 +1,7 @@
 import { ChainError, EsploraClient, MAX_BROADCAST_BYTES } from '@qbtc/chain'
 import { deserialize, fromHex, masterKeyFromSeed, mnemonicToSeed, sighash, verifySiglistEntry } from '@qbtc/crypto'
 import { describe, expect, it, vi } from 'vitest'
-import { addressFromPubkey, decodeAddress, sighashCommitsTokenId } from '../../src/main/brand/crypto'
+import { addressFromPubkey, decodeAddress, sighashCommitsTokenId } from '../../src/main/crypto'
 import { deriveStakingKey, fixedStakingOwners } from '../../src/main/wallet/stakingKeys'
 import { buildSignedTransactionWithKey, importedKeyFromStored, ordinaryKeyAddress, signUnsignedTxWithKey } from '../../src/main/wallet/keyWallet'
 import { buildSignedTransaction, deriveInputKeypair, signUnsignedTx } from '../../src/main/wallet/signTx'

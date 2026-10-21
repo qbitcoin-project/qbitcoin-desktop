@@ -1,7 +1,7 @@
 import { ChainError } from '@qbtc/chain'
 import { deserialize, fromHex, masterKeyFromSeed, mnemonicToSeed, scriptP2PK, setSchnorrEnabled, SIGHASH, sighash, toHex, verifySiglistEntry } from '@qbtc/crypto'
 import { describe, expect, it, vi } from 'vitest'
-import { addressFromPubkey, decodeAddress, sighashCommitsTokenId } from '../../src/main/brand/crypto'
+import { addressFromPubkey, decodeAddress, sighashCommitsTokenId } from '../../src/main/crypto'
 import { delegationMark, parseDelegationMark, decodeDelegatePubkeyhash, encodeDelegatePubkeyhash, delegationScript, ownerPubkeyhash } from '../../src/main/wallet/delegation'
 import { DelegationMetaStore, emptyDelegationJournal, validateDelegationJournal } from '../../src/main/wallet/delegationStore'
 import { deriveStakingKey, fixedStakingOwners } from '../../src/main/wallet/stakingKeys'

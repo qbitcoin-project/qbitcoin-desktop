@@ -1,5 +1,5 @@
 import { exportAccountXpubFor, masterKeyFromSeed } from '@qbtc/crypto'
-import { addressFromScripthash, DERIVATION_SCHEMES, exportAccountXpub, META_V1_SCHEME_ID } from '../../src/main/brand/crypto'
+import { addressFromScripthash, DERIVATION_SCHEMES, exportAccountXpub, META_V1_SCHEME_ID } from '../../src/main/crypto'
 import { describe, expect, it } from 'vitest'
 import type { WalletMeta } from '../../src/main/wallet/meta'
 import {

@@ -3,17 +3,17 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { app, clipboard } from 'electron'
 import { clearImportedKeyClipboard } from '../privacy/clipboard'
-import { btcEsploraDefaultsFor, BtcEsploraClient, ChainClient, type NodeEndpoint } from '@qbtc/chain'
+import { btcEsploraDefaultsFor, BtcEsploraClient, ChainClient, nodesFor, type NodeEndpoint } from '@qbtc/chain'
 import { generateMnemonic, hash256, isSchnorrEnabled, masterKeyFromSeed, mnemonicToSeed, parseAccountXpub, toHex, validateMnemonic, type HDKey, type Network } from '@qbtc/crypto'
 import type { Vault } from '@qbtc/vault'
 import { RestorableVault } from './RestorableVault'
-import { addressFromPubkey, addressFromScripthash, addressFromXpub, decodeAddress, DOWNGRADE, exportAccountXpub, UPGRADE, validateAddress } from '../brand/crypto'
+import { addressFromPubkey, addressFromScripthash, addressFromXpub, decodeAddress, DOWNGRADE, exportAccountXpub, UPGRADE, validateAddress } from '../crypto'
 import { DELEGATE_PROFILES } from '../brand/delegation'
 import { DelegationService } from '../wallet/DelegationService'
 import { DelegationMetaStore } from '../wallet/delegationStore'
 import { deriveStakingKey, fixedStakingOwners, type StakingOwner } from '../wallet/stakingKeys'
 import { SpendCoordinator } from '../wallet/SpendCoordinator'
-import { defaultNodesFor } from '../brand/nodes'
+import { DEFAULT_NODES } from '../brand/nodes'
 import { PROFILE } from '../brand/profile'
 import type { AddressAlgo, KeyInspection, NodeKind, NodeSettings, NodeStatus, SendPreview, SendResult, SweepScan, UpgradeConvertRequest, UpgradePlanView, VaultStatus, WalletInfo, WatchInput } from '../../shared/protocol'
 import { deriveClassicalAddress } from '../wallet/addresses'
@@ -110,7 +110,7 @@ export function createWalletCore(): WalletCore {
 
   // The public endpoints this build ships for its network (a brand value; may
   // be empty while a network is unlaunched).
-  const publicEndpoints = defaultNodesFor(NETWORK)
+  const publicEndpoints = nodesFor(DEFAULT_NODES, NETWORK)
   // Node selection (plain config, like the registry) — read at startup so the chain
   // client can be built before any unlock. Slots: a bundled public node, the user's
   // own Esplora REST node (same dialect, different URL), or a community node they

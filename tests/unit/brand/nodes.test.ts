@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_NODES, defaultNodesFor } from '../../../src/main/brand/nodes'
+import { nodesFor } from '@qbtc/chain'
+import { DEFAULT_NODES } from '../../../src/main/brand/nodes'
 
-// BRAND TEST: pins this brand's bundled nodes; the shape invariants hold for
+// BRAND FILE: pins this brand's bundled nodes; the shape invariants hold for
 // every brand.
 describe('bundled nodes', () => {
   it("ships the project's public node for both networks", () => {
-    expect(defaultNodesFor('mainnet').map((n) => n.url)).toEqual(['https://api.qbitcoin.net'])
-    expect(defaultNodesFor('testnet').map((n) => n.url)).toEqual(['https://api-testnet.qbitcoin.net'])
+    expect(nodesFor(DEFAULT_NODES, 'mainnet').map((n) => n.url)).toEqual(['https://api.qbitcoin.net'])
+    expect(nodesFor(DEFAULT_NODES, 'testnet').map((n) => n.url)).toEqual(['https://api-testnet.qbitcoin.net'])
     for (const n of DEFAULT_NODES) expect(n.operator).toBe('QBitcoin Project')
   })
 
@@ -18,7 +19,7 @@ describe('bundled nodes', () => {
       expect(n.operator.length).toBeGreaterThan(0)
     }
     for (const network of ['mainnet', 'testnet'] as const) {
-      const list = defaultNodesFor(network)
+      const list = nodesFor(DEFAULT_NODES, network)
       expect(list.every((n) => n.network === network)).toBe(true)
       const priorities = list.map((n) => n.priority)
       expect(priorities).toEqual([...priorities].sort((a, b) => a - b))

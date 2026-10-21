@@ -1,7 +1,7 @@
 import { ChainError } from '@qbtc/chain'
 import { deserialize, fromHex, masterKeyFromSeed, mnemonicToSeed, sighash, toHex, verifySiglistEntry } from '@qbtc/crypto'
 import { describe, expect, it, vi } from 'vitest'
-import { addressFromPubkey, decodeAddress, sighashCommitsTokenId } from '../../src/main/brand/crypto'
+import { addressFromPubkey, decodeAddress, sighashCommitsTokenId } from '../../src/main/crypto'
 import { STAKE_MATURITY } from '../../src/main/brand/staking'
 import { deriveStakingKey, fixedStakingOwners } from '../../src/main/wallet/stakingKeys'
 import { importedKeyFromStored, ordinaryKeyAddress, signUnsignedTxWithKey } from '../../src/main/wallet/keyWallet'

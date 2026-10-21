@@ -1,5 +1,5 @@
-/* BRAND FILE: the accent ramp, imported by styles/app.css. Brands
-   replace the values in their brand files — everything else in app.css (surfaces,
+/* BRAND FILE: the accent ramp, imported by styles/app.css. Each brand keeps
+   its own copy of this file - everything else in app.css (surfaces,
    ink, success/danger/warning, focus ring) is semantic and stays shared.
 
    The ramp is generated in OKLCH from one brand colour, so the hover/pressed

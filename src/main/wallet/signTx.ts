@@ -21,7 +21,7 @@ import {
   deriveFalconKeypair,
   requireScheme,
   sighashCommitsTokenId,
-} from '../brand/crypto'
+} from '../crypto'
 import type { UnsignedTx } from './buildTx'
 
 export interface SignedTx {

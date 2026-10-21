@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { InMemoryVaultStorage, Vault } from '@qbtc/vault'
 import { falcon512KeygenFromSeed, getPublicKey, masterKeyFromSeed, mnemonicToSeed, schnorrGetPublicKey } from '@qbtc/crypto'
-import { addressFromPubkey, encodeWif, exportAccountXpub } from '../../src/main/brand/crypto'
+import { addressFromPubkey, encodeWif, exportAccountXpub } from '../../src/main/crypto'
 import { RestorableVault, type RestoreStorage } from '../../src/main/vault/RestorableVault'
 import type { WalletEntry } from '../../src/main/vault/registry'
 import { WalletBackupService } from '../../src/main/wallet/WalletBackupService'

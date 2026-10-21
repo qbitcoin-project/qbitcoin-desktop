@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { btcP2shP2wshMultisig, fromHex, toHex, type Network } from '@qbtc/crypto'
-import { UPGRADE } from '../../../src/main/brand/crypto'
+import { UPGRADE } from '../../../src/main/crypto'
 
-// QBitcoin brand assertions for the upgrade config. Lives only in the
-// QBitcoin brand tests: it pins the profile's `upgrade` values to the
+// BRAND FILE: QBitcoin assertions for the upgrade config. Lives only in this
+// brand: it pins the profile's `upgrade` values to the
 // node's consensus constants — the federated 2-of-3 P2SH-P2WSH lock built
 // from the operators' QBT_LOCK_PUBKEYS. The testnet address is confirmed
 // against the LIVE Bitcoin testnet4 chain (the pool already holds funds on

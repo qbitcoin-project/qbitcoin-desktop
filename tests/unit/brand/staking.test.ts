@@ -1,9 +1,10 @@
+// BRAND FILE: pins this brand's staking delays, derivations and service.
 import { hkdf } from '@noble/hashes/hkdf'
 import { sha256 } from '@noble/hashes/sha256'
 import { derivePath, masterKeyFromSeed, mnemonicToSeed, toHex } from '@qbtc/crypto'
 import { describe, expect, it } from 'vitest'
 import { DELEGATE_PROFILES, STAKING_DERIVATIONS } from '../../../src/main/brand/delegation'
-import { deriveFalconKeypair, nativePath } from '../../../src/main/brand/crypto'
+import { deriveFalconKeypair, nativePath } from '../../../src/main/crypto'
 import { STAKE_MATURITY } from '../../../src/main/brand/staking'
 import { decodeDelegatePubkeyhash, delegationAddress, ownerPubkeyhash } from '../../../src/main/wallet/delegation'
 import { deriveStakingKey, fixedStakingOwners, stakingPath, type StakingOwner } from '../../../src/main/wallet/stakingKeys'

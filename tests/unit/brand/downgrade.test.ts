@@ -9,10 +9,10 @@ import {
   toHex,
   type Network,
 } from '@qbtc/crypto'
-import { addressFromScripthash, DOWNGRADE } from '../../../src/main/brand/crypto'
+import { addressFromScripthash, DOWNGRADE } from '../../../src/main/crypto'
 
-// QBitcoin brand assertions for the downgrade config. Lives only in the
-// QBitcoin brand tests: it pins the covenant scripts and addresses
+// BRAND FILE: QBitcoin assertions for the downgrade config. Lives only in this
+// brand: it pins the covenant scripts and addresses
 // derived from the profile's `downgrade` to the values the chain actually
 // uses — the federation era (2-of-3 Falcon-512 CHECKMULTISIG, hash256
 // scripthashes) and, on testnet, the retired single-key era whose pins were

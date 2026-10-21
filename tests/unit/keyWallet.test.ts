@@ -11,7 +11,7 @@ import {
 import {
   addressFromPubkey,
   encodeWif,
-} from '../../src/main/brand/crypto'
+} from '../../src/main/crypto'
 import type { Algo, UnsignedTx } from '../../src/main/wallet/buildTx'
 import {
   createKeyAddressSource,

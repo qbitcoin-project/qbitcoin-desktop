@@ -1,6 +1,6 @@
 import type { ChainTx, ChainTxIn, ChainTxOut } from '@qbtc/chain'
 import { describe, expect, it, vi } from 'vitest'
-import { decodeAddress } from '../../src/main/brand/crypto'
+import { decodeAddress } from '../../src/main/crypto'
 import { stakingChainActivity } from '../../src/main/wallet/stakingActivity'
 import { StakingHistory } from '../../src/main/wallet/StakingHistory'
 import { mergeStakingActivity } from '../../src/renderer/lib/stakingView'

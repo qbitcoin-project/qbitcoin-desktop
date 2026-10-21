@@ -2,7 +2,7 @@ import { app, dialog, Menu, shell, type MenuItemConstructorOptions } from 'elect
 import { HOMEPAGE, PRODUCT_NAME } from './appInfo'
 import { checkForUpdatesInteractive } from './updater'
 
-// Application menu. Labels come from appInfo (a BRAND FILE) — never from
+// Application menu. Labels come from appInfo (brand values) - never from
 // app.getName(), which reports the raw package name and, more importantly,
 // must stay untouched because userData derives from it.
 

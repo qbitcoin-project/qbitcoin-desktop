@@ -3,7 +3,7 @@ import {
   decodeBase58Check, deserialize, encodeBase58Check, fromHex, hash160, hash256,
   SchnorrDisabledError, setSchnorrEnabled, SIGHASH, sighash, toHex, verifySiglistEntry,
 } from '@qbtc/crypto'
-import { addressFromPubkey, addressFromScripthash, decodeAddress, encodeWif, sighashCommitsTokenId } from '../../src/main/brand/crypto'
+import { addressFromPubkey, addressFromScripthash, decodeAddress, encodeWif, sighashCommitsTokenId } from '../../src/main/crypto'
 import { DELEGATION } from '../../src/main/brand/delegation'
 import { delegationAddress, delegationScript, delegationScripthash, encodeDelegatePubkeyhash, ownerPubkeyhash } from '../../src/main/wallet/delegation'
 import { decodeWalletWif } from '../../src/main/wallet/keyWif'

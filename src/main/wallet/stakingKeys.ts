@@ -1,6 +1,7 @@
 import { hkdfSync } from 'node:crypto'
 import { derivePath, falcon512KeygenFromSeed, FALCON512_SEED_BYTES, type HDKey, type Network } from '@qbtc/crypto'
-import { STAKING_DERIVATIONS, type StakingDerivation } from '../brand/delegation'
+import { STAKING_DERIVATIONS } from '../brand/delegation'
+import type { StakingDerivation } from './delegationTypes'
 import type { StakingAlgo, StakingOwnerAlgo } from '../../shared/staking'
 
 export type StakingOwner =

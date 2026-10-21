@@ -1,21 +1,21 @@
 import { bindProfile } from '@qbtc/crypto'
-import { PROFILE } from './profile'
+import { PROFILE } from './brand/profile'
 
 // The chain-bound crypto facade: @qbtc/crypto's profile-dependent functions
-// with every chain value pre-filled from ./profile. This is the ONE place the
-// app binds its profile — whatever needs a chain value (schemes, address
+// with every chain value pre-filled from ./brand/profile. This is the ONE place the
+// app binds its profile - whatever needs a chain value (schemes, address
 // magic, WIF versions, HKDF labels, message magic, conversion parameters)
 // imports it from here; chain-neutral primitives (hashes, HD math,
 // transactions, signing, Bitcoin) come straight from @qbtc/crypto.
 //
-// Not a brand file: brands edit ./profile and ./nodes only.
+// Shared code: chain values come from ./brand/profile.
 //
 // bindProfile validates the profile up front, so a misconfigured brand fails
 // at startup rather than at first use.
 export const chain = bindProfile(PROFILE)
 
 // The pre-profile names, so call sites keep their signatures and only change
-// the import source. bindProfile returns closures, not methods — destructuring
+// the import source. bindProfile returns closures, not methods - destructuring
 // them is safe.
 export const {
   activeScheme,

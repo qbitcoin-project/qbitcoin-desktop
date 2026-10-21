@@ -1,23 +1,11 @@
 import type { Network } from '@qbtc/crypto'
-import type { StakingAlgo } from '../../shared/staking'
+import type { DelegateProfile, DelegationPrefixes, StakingDerivation } from '../wallet/delegationTypes'
 
 // BRAND FILE: delegated-key envelopes and public pubkeyhash prefixes from the
 // chain's network parameters. Independent of the owner's signing algorithm.
-export const DELEGATION: Readonly<Record<Network, {
-  readonly wifHash256: number
-  readonly wifHash160: number
-  readonly pubkeyhashMagic: Uint8Array
-}>> = {
+export const DELEGATION: Readonly<Record<Network, DelegationPrefixes>> = {
   mainnet: { wifHash256: 0x8d, wifHash160: 0x8e, pubkeyhashMagic: Uint8Array.of(0x27, 0x10) },
   testnet: { wifHash256: 0xf0, wifHash160: 0xf1, pubkeyhashMagic: Uint8Array.of(0x3f, 0x00) },
-}
-
-export interface StakingDerivation {
-  readonly id: string
-  readonly schemeId: string
-  readonly coinType: Readonly<Record<Network, number>>
-  readonly falconHdInfo: string
-  readonly active: boolean
 }
 
 // BRAND FILE: immutable recovery paths. Never edit a shipped entry; retain
@@ -27,18 +15,6 @@ export const STAKING_DERIVATIONS: readonly StakingDerivation[] = [{
   id: 'staking-owner-v2', schemeId: 'qbt-v1-slip44',
   coinType: { mainnet: 2009, testnet: 1 }, falconHdInfo: 'qbt/pq/falcon512/v1', active: true,
 }]
-
-export interface DelegateProfile {
-  readonly id: string
-  readonly label: string
-  readonly network: Network
-  readonly hashes: Readonly<Record<StakingAlgo, string>>
-  readonly status: 'active' | 'legacy'
-  readonly minimumAtomic: string
-  readonly minimumVerified: boolean
-  readonly commission?: string
-  readonly fundingEnabled: boolean
-}
 
 // BRAND FILE: public service identifiers, not payment addresses. Funding is
 // open on both networks, with a confirmed minimum of 0.001 coins per deposit.

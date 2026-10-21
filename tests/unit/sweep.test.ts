@@ -1,6 +1,6 @@
 import type { AddressInfo, Utxo } from '@qbtc/chain'
 import { deserialize, fromHex, getPublicKey, scriptP2PK, SIGHASH, sighash, toHex, verifySiglistEntry } from '@qbtc/crypto'
-import { addressFromPubkey, decodeAddress, encodeWif, sighashCommitsTokenId } from '../../src/main/brand/crypto'
+import { addressFromPubkey, decodeAddress, encodeWif, sighashCommitsTokenId } from '../../src/main/crypto'
 import { describe, expect, it } from 'vitest'
 import { importedKeyFromStored, ordinaryKeyAddress, type ImportedKey } from '../../src/main/wallet/keyWallet'
 import { createSweepSession, type SweepBackend } from '../../src/main/wallet/sweep'

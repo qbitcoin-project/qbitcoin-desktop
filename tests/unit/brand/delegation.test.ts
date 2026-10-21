@@ -4,7 +4,7 @@ import { DELEGATION } from '../../../src/main/brand/delegation'
 import { encodeDelegatePubkeyhash } from '../../../src/main/wallet/delegation'
 import { delegatedKeyFixture } from '../../fixtures/delegatedKey'
 
-// BRAND TEST: these values belong to this chain's network parameters.
+// BRAND FILE: these values belong to this chain's network parameters.
 describe('delegated-key network parameters', () => {
   it('pins the WIF versions and public-hash prefixes', () => {
     expect(DELEGATION.mainnet.wifHash256).toBe(0x8d)

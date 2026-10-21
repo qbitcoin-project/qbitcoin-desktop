@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as crypto from '@qbtc/crypto'
-import { decodeWif, encodeWif } from '../../src/main/brand/crypto'
+import { decodeWif, encodeWif } from '../../src/main/crypto'
 import { PROFILE } from '../../src/main/brand/profile'
 import { decodeWalletWif } from '../../src/main/wallet/keyWif'
 import { importedKeyFromStored, importedKeyFromWif } from '../../src/main/wallet/keyWallet'

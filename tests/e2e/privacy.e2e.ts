@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
 import { acceptPrivacy, captureProtected, focusApp, focusedWindow } from './privacyHelpers'
-import { encodeWif } from '../../src/main/brand/crypto'
+import { encodeWif } from '../../src/main/crypto'
 import type { PrivacyApi } from '../../src/shared/privacy'
 
 const PASSWORD = 'correct-horse-battery-staple'

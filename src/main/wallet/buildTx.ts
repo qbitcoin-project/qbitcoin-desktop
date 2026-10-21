@@ -1,5 +1,5 @@
 import { encodeTokenTransfer, fromHex, toHex, type TxOutput } from '@qbtc/crypto'
-import { decodeAddress } from '../brand/crypto'
+import { decodeAddress } from '../crypto'
 import type { Algo } from './discovery'
 import { feeForBytes, transactionSizeUpperBound } from './txSize'
 

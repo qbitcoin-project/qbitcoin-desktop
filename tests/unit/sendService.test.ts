@@ -3,7 +3,7 @@ import { ChainError, MAX_BROADCAST_BYTES } from '@qbtc/chain'
 import { SendService, type SendDeps } from '../../src/main/wallet/SendService'
 import type { GatheredUtxo } from '../../src/main/wallet/spendable'
 import type { UnsignedTx } from '../../src/main/wallet/buildTx'
-import { addressFromScripthash } from '../../src/main/brand/crypto'
+import { addressFromScripthash } from '../../src/main/crypto'
 
 const RECIPIENT = 'bqhHWtW8DUJWfCvik4BgagviXbMyyNBhLnV'
 const CHANGE = 'bqaghDewzjiedo8mH7whakka5nSgRvT7Wr7'

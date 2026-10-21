@@ -3,11 +3,11 @@ import { coinTypeFor, type ChainProfile, type DerivationScheme } from '@qbtc/cry
 // The chain profile: everything that makes this build's chain THIS chain from
 // the wallet-crypto perspective — derivation schemes, address magic, WIF
 // versions, HKDF labels, signed-message magic, conversion parameters.
-// @qbtc/crypto ships no chain constants; this file injects ours, and ./crypto
+// @qbtc/crypto ships no chain constants; this file injects ours, and ../crypto
 // binds it into the facade the rest of main imports.
 //
-// BRAND FILE: like the node's chain parameters, each brand edits these
-// values in place. This is the QBitcoin brand.
+// BRAND FILE: like the node's chain parameters, each brand keeps its own copy
+// of these values. This is the QBitcoin brand.
 //
 // FROZEN on a shipped brand: every value here except the `upgrade` display
 // limits is consensus- or storage-affecting — changing schemes, magic, HKDF

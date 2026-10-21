@@ -1,6 +1,6 @@
 import { ChainError, type ChainTx } from '@qbtc/chain'
 import { toHex, type Network } from '@qbtc/crypto'
-import { decodeAddress } from '../brand/crypto'
+import { decodeAddress } from '../crypto'
 import { STAKE_MATURITY } from '../brand/staking'
 import { isMature } from '../../shared/maturity'
 import type { UnsignedInput } from './buildTx'
