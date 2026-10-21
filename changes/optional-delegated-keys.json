@@ -1,0 +1,7 @@
+{
+  "id": "optional-delegated-keys",
+  "scope": "shared",
+  "type": "internal",
+  "bump": "none",
+  "text": "Allow a brand to ship without delegated private keys."
+}

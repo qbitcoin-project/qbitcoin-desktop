@@ -1,6 +1,13 @@
 import { decodeBase58Check, encodeBase58Check, hash160, hash256, opPushdata, type Algorithm, type Network, type TxInput } from '@qbtc/crypto'
 import { addressFromScripthash } from '../crypto'
 import { DELEGATION } from '../brand/delegation'
+import type { DelegationPrefixes } from './delegationTypes'
+
+/** This build's delegation prefixes; a brand without delegated keys has none. */
+export function delegationPrefixes(network: Network): DelegationPrefixes {
+  if (DELEGATION === null) throw new Error('Delegated keys are not available in this build.')
+  return DELEGATION[network]
+}
 
 const concat = (...parts: Uint8Array[]): Uint8Array => Uint8Array.from(parts.flatMap((p) => [...p]))
 
@@ -43,12 +50,12 @@ export function delegationAddress(owner: Uint8Array, delegate: Uint8Array, netwo
 
 export function encodeDelegatePubkeyhash(hash: Uint8Array, network: Network): string {
   hashOp(hash)
-  return encodeBase58Check(DELEGATION[network].pubkeyhashMagic, hash)
+  return encodeBase58Check(delegationPrefixes(network).pubkeyhashMagic, hash)
 }
 
 export function decodeDelegatePubkeyhash(encoded: string, network: Network): Uint8Array {
   const { version, payload } = decodeBase58Check(encoded, 2)
-  const magic = DELEGATION[network].pubkeyhashMagic
+  const magic = delegationPrefixes(network).pubkeyhashMagic
   if (version.length !== magic.length || version.some((v, i) => v !== magic[i])) throw new Error('Wrong delegation network.')
   hashOp(payload)
   return payload

@@ -4,8 +4,7 @@ import {
   SchnorrDisabledError, setSchnorrEnabled, SIGHASH, sighash, toHex, verifySiglistEntry,
 } from '@qbtc/crypto'
 import { addressFromPubkey, addressFromScripthash, decodeAddress, encodeWif, sighashCommitsTokenId } from '../../src/main/crypto'
-import { DELEGATION } from '../../src/main/brand/delegation'
-import { delegationAddress, delegationScript, delegationScripthash, encodeDelegatePubkeyhash, ownerPubkeyhash } from '../../src/main/wallet/delegation'
+import { delegationAddress, delegationPrefixes, delegationScript, delegationScripthash, encodeDelegatePubkeyhash, ownerPubkeyhash } from '../../src/main/wallet/delegation'
 import { decodeWalletWif } from '../../src/main/wallet/keyWif'
 import { createKeyAddressSource, importedKeyFromStored, inspectWifKey, keyInputBytes, keyReceiveOps, signUnsignedTxWithKey } from '../../src/main/wallet/keyWallet'
 import { toCryptoTransaction } from '../../src/main/wallet/signTx'
@@ -77,10 +76,10 @@ describe('delegated WIF decoding and address discovery', () => {
     expect(() => decodeWalletWif(badChecksum, 'mainnet')).toThrow(/checksum/)
     expect(() => decodeWalletWif('not a WIF!', 'mainnet')).toThrow(/Base58/)
     for (const length of [0, 31, 33, 2177, 2179]) {
-      const bad = encodeBase58Check(Uint8Array.of(DELEGATION.mainnet.wifHash256), new Uint8Array(length + 32).fill(1))
+      const bad = encodeBase58Check(Uint8Array.of(delegationPrefixes('mainnet').wifHash256), new Uint8Array(length + 32).fill(1))
       expect(() => decodeWalletWif(bad, 'mainnet')).toThrow(/length/)
     }
-    const scalarZero = encodeBase58Check(Uint8Array.of(DELEGATION.mainnet.wifHash160), new Uint8Array(52))
+    const scalarZero = encodeBase58Check(Uint8Array.of(delegationPrefixes('mainnet').wifHash160), new Uint8Array(52))
     expect(() => decodeWalletWif(scalarZero, 'mainnet')).toThrow(/valid secp256k1/)
     const unknown = encodeBase58Check(Uint8Array.of(0x01), new Uint8Array(64).fill(1))
     expect(() => decodeWalletWif(unknown, 'mainnet')).toThrow()

@@ -19,11 +19,11 @@ export function decodeWalletWif(wif: string, network: Network): WalletWif {
   const { payload, version } = decoded
   try {
     const detected = (['mainnet', 'testnet'] as const).find((n) =>
-      version[0] === PROFILE.wifVersion[n] || version[0] === DELEGATION[n].wifHash160 || version[0] === DELEGATION[n].wifHash256)
+      version[0] === PROFILE.wifVersion[n] || version[0] === DELEGATION?.[n].wifHash160 || version[0] === DELEGATION?.[n].wifHash256)
     if (detected === undefined) throw new WifError(`Unknown WIF version byte 0x${version[0]!.toString(16).padStart(2, '0')}.`)
     if (detected !== network) throw new WifNetworkError(network, detected)
     const delegated = version[0] !== PROFILE.wifVersion[network]
-    const hashLength = delegated ? (version[0] === DELEGATION[network].wifHash256 ? 32 : 20) : 0
+    const hashLength = delegated ? (version[0] === DELEGATION?.[network].wifHash256 ? 32 : 20) : 0
     const keyLength = payload.length - hashLength
     if (keyLength !== 32 && keyLength !== FALCON512_KEYPAIR_BYTES) {
       if (!delegated && keyLength === 33 && payload[32] === 1) {

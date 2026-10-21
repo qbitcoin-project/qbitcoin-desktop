@@ -7,12 +7,13 @@ import { delegatedKeyFixture } from '../../fixtures/delegatedKey'
 // BRAND FILE: these values belong to this chain's network parameters.
 describe('delegated-key network parameters', () => {
   it('pins the WIF versions and public-hash prefixes', () => {
-    expect(DELEGATION.mainnet.wifHash256).toBe(0x8d)
-    expect(DELEGATION.mainnet.wifHash160).toBe(0x8e)
-    expect(DELEGATION.testnet.wifHash256).toBe(0xf0)
-    expect(DELEGATION.testnet.wifHash160).toBe(0xf1)
-    expect(toHex(DELEGATION.mainnet.pubkeyhashMagic)).toBe('2710')
-    expect(toHex(DELEGATION.testnet.pubkeyhashMagic)).toBe('3f00')
+    expect(DELEGATION).not.toBeNull()
+    expect(DELEGATION!.mainnet.wifHash256).toBe(0x8d)
+    expect(DELEGATION!.mainnet.wifHash160).toBe(0x8e)
+    expect(DELEGATION!.testnet.wifHash256).toBe(0xf0)
+    expect(DELEGATION!.testnet.wifHash160).toBe(0xf1)
+    expect(toHex(DELEGATION!.mainnet.pubkeyhashMagic)).toBe('2710')
+    expect(toHex(DELEGATION!.testnet.pubkeyhashMagic)).toBe('3f00')
   })
   it.each([
     ['mainnet', 32, 0x8d, '6nAfodPCzaqTG4jb3PUP4WFXPeth3xNx1Vr9UPNrLroJzdsY9fJL'],
