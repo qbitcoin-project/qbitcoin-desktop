@@ -1,0 +1,7 @@
+{
+  "id": "upstream-note-scopes",
+  "scope": "shared",
+  "type": "internal",
+  "bump": "none",
+  "text": "Let a brand ignore declared upstream note scopes and exclude shared notes that do not apply to it."
+}

@@ -12,6 +12,7 @@ const versionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
 const configPath = 'release.config.json'
 const historyPath = 'releases/history.json'
 const draftPath = 'releases/draft.json'
+const excludedPath = 'releases/excluded-notes.json'
 const json = (value) => `${JSON.stringify(value, null, 2)}\n`
 const hash = (value) => createHash('sha256').update(value).digest('hex')
 const fail = (message) => { throw new Error(message) }
@@ -60,10 +61,13 @@ function date(value) {
 }
 
 function config(value, pkg) {
-  exactKeys(value, ['schemaVersion', 'brand', 'releaseBranch', 'tagPrefix', 'packageName', 'productName', 'aliases'], 'release configuration')
+  exactKeys(value, ['schemaVersion', 'brand', 'releaseBranch', 'tagPrefix', 'packageName', 'productName', 'aliases', 'upstreamScopes'], 'release configuration')
   if (value.schemaVersion !== 1 || !Array.isArray(value.aliases) || value.aliases.some((name) => typeof name !== 'string' || name.length < 2)) fail('Invalid release configuration')
+  // Brands whose notes arrive with merged upstream code; their own releases consume them.
+  const scopes = value.upstreamScopes
+  if (!Array.isArray(scopes) || new Set(scopes).size !== scopes.length || scopes.some((scope) => typeof scope !== 'string' || !idPattern.test(scope) || scope === 'shared' || scope === value.brand)) fail('Invalid release configuration')
   if (value.brand === null) {
-    if ([value.releaseBranch, value.tagPrefix, value.packageName, value.productName].some((field) => field !== null) || value.aliases.length) fail('An unbranded configuration must have neutral release fields')
+    if ([value.releaseBranch, value.tagPrefix, value.packageName, value.productName].some((field) => field !== null) || value.aliases.length || scopes.length) fail('An unbranded configuration must have neutral release fields')
   } else {
     if (!idPattern.test(value.brand) || typeof value.releaseBranch !== 'string' || !/^[a-z][a-z0-9/-]*$/.test(value.releaseBranch) || !/^[a-z][a-z0-9-]*-v$/.test(value.tagPrefix)) fail('Invalid current-brand identity')
     if (value.packageName !== pkg.name || !value.productName || typeof value.productName !== 'string') fail('Release configuration does not match this package')
@@ -124,18 +128,36 @@ function load() {
   const pkg = document('package.json')
   version(pkg.version)
   const cfg = config(document(configPath), pkg)
-  const notes = readdirSync(filePath('changes')).filter((name) => name.endsWith('.json')).sort().map((name) => fragment(document(`changes/${name}`), cfg, name))
+  // Notes of a declared upstream brand belong to its releases: skip them unread.
+  const notes = readdirSync(filePath('changes')).filter((name) => name.endsWith('.json')).sort().flatMap((name) => {
+    const value = document(`changes/${name}`)
+    return cfg.upstreamScopes.includes(value?.scope) ? [] : [fragment(value, cfg, name)]
+  })
   const history = document(historyPath), draft = document(draftPath)
+  const excluded = existsSync(filePath(excludedPath)) ? document(excludedPath) : { schemaVersion: 1, notes: [] }
   exactKeys(history, ['schemaVersion', 'releases'], 'release history')
   if (history.schemaVersion !== 1 || !Array.isArray(history.releases)) fail('Invalid release history')
+  exactKeys(excluded, ['schemaVersion', 'notes'], 'excluded notes')
+  if (excluded.schemaVersion !== 1 || !Array.isArray(excluded.notes)) fail('Invalid excluded notes')
   const state = { pkg, cfg, notes, history, draft }
-  if (cfg.brand === null && (history.releases.length || draft !== null)) fail('An unbranded configuration cannot contain brand release records')
+  if (cfg.brand === null && (history.releases.length || draft !== null || excluded.notes.length)) fail('An unbranded configuration cannot contain brand release records')
   const used = new Set()
   for (let i = history.releases.length - 1; i >= 0; i--) {
     checkRecord(history.releases[i], state, used)
     if (i > 0 && compare(history.releases[i - 1].version, history.releases[i].version) <= 0) fail('Release history must have unique versions, newest first')
   }
-  state.pending = notes.filter((note) => !used.has(note.id))
+  // Shared notes about features this brand does not ship: handled, but never released.
+  const excludedIds = new Set()
+  for (const entry of excluded.notes) {
+    exactKeys(entry, ['id', 'hash'], 'excluded note')
+    const note = notes.find((candidate) => candidate.id === entry.id)
+    if (!note || note.scope !== 'shared' || entry.hash !== hash(json(note))) fail(`An excluded note must be an existing, unchanged shared note: ${entry.id}`)
+    if (used.has(entry.id)) fail(`An excluded note was already released: ${entry.id}`)
+    if (excludedIds.has(entry.id)) fail(`A note is excluded more than once: ${entry.id}`)
+    excludedIds.add(entry.id)
+  }
+  state.excluded = [...excludedIds]
+  state.pending = notes.filter((note) => !used.has(note.id) && !excludedIds.has(note.id))
   if (draft !== null) {
     checkRecord(draft, state, used, true)
     if (history.releases.length && compare(draft.version, history.releases[0].version) <= 0) fail('Draft version must follow the last published release')
@@ -154,7 +176,7 @@ function assertChangelog(state) {
 function sourceDigest(ref) {
   gitRoot()
   const names = (ref ? git('ls-tree', '-r', '--name-only', '-z', ref) : git('ls-files', '--cached', '--others', '--exclude-standard', '-z')).split('\0').filter(Boolean)
-  const inputs = [...new Set(names)].filter((name) => /^(src\/|build\/|resources\/|changes\/|\.github\/|package\.json$|pnpm-lock\.yaml$|release\.config\.json$|[^/]+\.(?:ts|mjs|yml|yaml|json)$)/.test(name)).sort()
+  const inputs = [...new Set(names)].filter((name) => /^(src\/|build\/|resources\/|changes\/|\.github\/|package\.json$|pnpm-lock\.yaml$|release\.config\.json$|releases\/excluded-notes\.json$|[^/]+\.(?:ts|mjs|yml|yaml|json)$)/.test(name)).sort()
   const digest = createHash('sha256')
   for (const name of inputs) {
     if (!ref && !existsSync(filePath(name))) continue
@@ -220,7 +242,7 @@ function preview(state) {
     brand: state.cfg.brand, packageVersion: state.pkg.version,
     published: state.history.releases.map(({ version, date, tag }) => ({ version, date, tag })),
     draft: state.draft ? { version: state.draft.version, date: state.draft.date, tag: state.draft.tag } : null,
-    pending: state.pending, suggestedVersion: state.cfg.brand && bump ? next.join('.') : null,
+    pending: state.pending, excluded: state.excluded, suggestedVersion: state.cfg.brand && bump ? next.join('.') : null,
   }
 }
 
@@ -260,7 +282,9 @@ function checkBase(state, base) {
   if (!/^[a-f0-9]{40}$/.test(base)) fail('--base requires an explicit full commit SHA')
   gitRoot()
   const previousConfig = optionalRefFile(base, configPath)
-  if (previousConfig !== null && json(JSON.parse(previousConfig)) !== json(state.cfg)) fail('Release identity must match the selected base; do not compare different brand histories')
+  // Only the identity that keeps release history continuous must match the base.
+  const identity = (value) => json({ schemaVersion: value.schemaVersion, brand: value.brand, tagPrefix: value.tagPrefix, packageName: value.packageName, productName: value.productName })
+  if (previousConfig !== null && identity(JSON.parse(previousConfig)) !== identity(state.cfg)) fail('Release identity must match the selected base; do not compare different brand histories')
   const previousHistory = previousConfig === null ? { releases: [] } : JSON.parse(refFile(base, historyPath))
   for (const record of previousHistory.releases) {
     if (json(state.history.releases.find((entry) => entry.version === record.version)) !== json(record)) fail('Published release history cannot be rewritten')

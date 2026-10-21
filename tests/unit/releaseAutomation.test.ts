@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -51,6 +52,7 @@ function writeJson(root: string, name: string, value: unknown) {
 }
 function read(root: string, name: string) { return readFileSync(join(root, name), 'utf8') }
 function readJson<T>(root: string, name: string): T { return JSON.parse(read(root, name)) }
+function noteHash(value: typeof note) { return createHash('sha256').update(`${JSON.stringify(value, null, 2)}\n`).digest('hex') }
 
 function git(root: string, ...args: string[]) {
   const result = spawnSync('git', args, { cwd: root, encoding: 'utf8', env: commandEnv })
@@ -90,6 +92,7 @@ function createFixture(brand = 'north'): Fixture {
   writeJson(root, 'release.config.json', {
     schemaVersion: 1, brand, releaseBranch: brand, tagPrefix: fixture.tagPrefix,
     packageName: `${brand}-wallet`, productName: `${displayName} Wallet`, aliases: [displayName],
+    upstreamScopes: [],
   })
   const previous = {
     version: previousVersion, date: '2031-03-01', tag: `${fixture.tagPrefix}${previousVersion}`,
@@ -316,7 +319,7 @@ describe('release automation CLI', () => {
     const fixture = createFixture()
     writeJson(fixture.root, 'release.config.json', {
       schemaVersion: 1, brand: null, releaseBranch: null, tagPrefix: null,
-      packageName: null, productName: null, aliases: [],
+      packageName: null, productName: null, aliases: [], upstreamScopes: [],
     })
     writeJson(fixture.root, 'releases/history.json', { schemaVersion: 1, releases: [] })
     write(fixture.root, 'CHANGELOG.md', '# Changelog\n')
@@ -332,6 +335,67 @@ describe('release automation CLI', () => {
       '--bump', note.bump, '--text', note.text], /another scope/i)
     writeJson(fixture.root, `changes/${note.id}.json`, { ...note, scope: 'south' })
     fails(fixture, ['check'], /another scope/i)
+  })
+
+  it('ignores notes from declared upstream scopes but still rejects unknown ones', () => {
+    const fixture = createFixture('south')
+    const config = readJson<Record<string, unknown>>(fixture.root, 'release.config.json')
+    writeJson(fixture.root, 'release.config.json', { ...config, upstreamScopes: ['north'] })
+    writeJson(fixture.root, `changes/${note.id}.json`, { ...note, scope: 'north', text: 'North Wallet now shows staking rewards.' })
+    succeeds(fixture, 'check')
+    expect(succeeds<Preview>(fixture, 'preview').pending).toEqual([])
+    fails(fixture, ['add', '--id', 'north-only', '--scope', 'north', '--type', note.type,
+      '--bump', note.bump, '--text', note.text], /another scope/i)
+    writeJson(fixture.root, 'changes/west-change.json', { ...note, id: 'west-change', scope: 'west' })
+    fails(fixture, ['check'], /another scope/i)
+  })
+
+  it.each([[['north']], [['shared']], [['south', 'south']], [['South']]])('rejects upstream scopes %j', (scopes) => {
+    const fixture = createFixture()
+    const config = readJson<Record<string, unknown>>(fixture.root, 'release.config.json')
+    writeJson(fixture.root, 'release.config.json', { ...config, upstreamScopes: scopes })
+    fails(fixture, ['check'], /Invalid release configuration/)
+  })
+
+  it('excludes listed shared notes from pending and the changelog', () => {
+    const fixture = createFixture()
+    const other = { id: 'faster-sync', scope: 'shared', type: 'changed', bump: 'patch', text: 'Wallet sync finishes sooner.' }
+    add(fixture)
+    add(fixture, other)
+    writeJson(fixture.root, 'releases/excluded-notes.json', { schemaVersion: 1, notes: [{ id: note.id, hash: noteHash(note) }] })
+    const preview = succeeds<Preview & { excluded: string[] }>(fixture, 'preview')
+    expect(preview.pending.map(({ id }) => id)).toEqual([other.id])
+    expect(preview.excluded).toEqual([note.id])
+    prepare(fixture)
+    const draft = readJson<ReleaseRecord>(fixture.root, 'releases/draft.json')
+    expect(draft.changes.map(({ id }) => id)).toEqual([other.id])
+    expect(draft.body).toContain(other.text)
+    expect(draft.body).not.toContain(note.text)
+  })
+
+  it('rejects an exclusion that is unknown, changed, not shared or already released', () => {
+    const fixture = createFixture()
+    const rejects = (id: string, hash: string) => {
+      writeJson(fixture.root, 'releases/excluded-notes.json', { schemaVersion: 1, notes: [{ id, hash }] })
+      fails(fixture, ['check'], /excluded/i)
+      rmSync(join(fixture.root, 'releases/excluded-notes.json'))
+    }
+    rejects('missing-note', 'a'.repeat(64))
+    add(fixture)
+    rejects(note.id, 'b'.repeat(64))
+    const own = { ...note, id: 'own-change', scope: 'north' }
+    add(fixture, own)
+    rejects(own.id, noteHash(own))
+    publish(fixture)
+    rejects(note.id, noteHash(note))
+  })
+
+  it('compares only the release identity with the selected base', () => {
+    const fixture = createFixture()
+    const base = git(fixture.root, 'rev-parse', 'HEAD')
+    const config = readJson<Record<string, unknown>>(fixture.root, 'release.config.json')
+    writeJson(fixture.root, 'release.config.json', { ...config, aliases: ['North', 'northscan.org'], upstreamScopes: ['south'] })
+    succeeds(fixture, 'check', '--base', base)
   })
 
   it('rejects current-brand prose in shared notes while allowing its own scope', () => {

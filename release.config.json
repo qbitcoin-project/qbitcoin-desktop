@@ -10,5 +10,6 @@
     "QBT",
     "QBTC",
     "qbitcoin.net"
-  ]
+  ],
+  "upstreamScopes": []
 }
