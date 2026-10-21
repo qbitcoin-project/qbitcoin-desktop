@@ -1,0 +1,7 @@
+{
+  "id": "explicit-test-build-switch",
+  "scope": "shared",
+  "type": "internal",
+  "bump": "none",
+  "text": "Report a missing test build configuration clearly instead of failing on a missing file."
+}

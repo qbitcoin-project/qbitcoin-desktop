@@ -1,8 +1,15 @@
 // Pure build planning. No certificate access, subprocesses or credential reads.
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 export function loadBetaProfile(root) {
+  // A brand without a test build simply has no beta config; say so plainly.
+  if (!existsSync(join(root, 'electron-builder.beta.json'))) {
+    throw new Error('This brand has no test build: electron-builder.beta.json is missing.')
+  }
+  if (!existsSync(join(root, 'releases/beta-notes.json'))) {
+    throw new Error('The test build has no release notes: releases/beta-notes.json is missing.')
+  }
   const config = JSON.parse(readFileSync(join(root, 'electron-builder.beta.json'), 'utf8'))
   const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
   const notes = JSON.parse(readFileSync(join(root, 'releases/beta-notes.json'), 'utf8'))
