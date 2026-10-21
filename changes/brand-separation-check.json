@@ -1,0 +1,7 @@
+{
+  "id": "brand-separation-check",
+  "scope": "shared",
+  "type": "internal",
+  "bump": "none",
+  "text": "Check that brand names and markers stay inside brand files."
+}

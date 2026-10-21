@@ -33,7 +33,8 @@
     "release:preview": "node build/release.mjs preview",
     "release:prepare": "node build/release.mjs prepare",
     "release:check": "node build/release.mjs check",
-    "release:record": "node build/release.mjs record"
+    "release:record": "node build/release.mjs record",
+    "brand:check": "node build/brand.mjs check"
   },
   "dependencies": {
     "@fontsource-variable/inter": "5.3.0",

@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "markedDirectories": [
+    "src/main/brand/",
+    "src/renderer/brand/",
+    "tests/unit/brand/"
+  ],
+  "paths": [
+    "build/brand/",
+    "releases/",
+    "resources/icon.png",
+    "resources/icon.svg",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "release.config.json",
+    "electron-builder.yml",
+    "electron-builder.test.yml",
+    "electron-builder.beta.json",
+    ".gitlab-ci.yml"
+  ],
+  "packageKeys": [
+    "name",
+    "version",
+    "description",
+    "author"
+  ],
+  "allowed": [
+    "@qbtc/"
+  ]
+}

@@ -9,7 +9,8 @@
     "QBitcoin",
     "QBT",
     "QBTC",
-    "qbitcoin.net"
+    "qbitcoin.net",
+    "qbtcscan.org"
   ],
   "upstreamScopes": []
 }

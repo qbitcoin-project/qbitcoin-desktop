@@ -29,6 +29,9 @@ jobs:
       - name: Check release metadata
         run: pnpm release:check
 
+      - name: Check brand separation
+        run: pnpm brand:check
+
       - name: Check change note coverage
         if: github.event_name == 'pull_request' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/') && github.event.before != '0000000000000000000000000000000000000000')
         env:
