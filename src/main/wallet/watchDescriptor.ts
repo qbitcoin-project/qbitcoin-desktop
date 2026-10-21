@@ -10,6 +10,7 @@ import {
   META_V1_SCHEME_ID,
   validateAddress,
 } from '../crypto'
+import { WATCH_DESCRIPTOR_KIND } from '../brand/identifiers'
 import { deriveFalconAddress } from './addresses'
 import { indicesFor, type WalletMeta } from './meta'
 
@@ -29,10 +30,9 @@ import { indicesFor, type WalletMeta } from './meta'
 //    scheme ids are accepted — scanning needs no scheme knowledge, and a
 //    descriptor may come from a newer wallet.
 
-// BRAND VALUE: the kind tag is persisted inside exported descriptors, so a
-// brand must never change it once shipped (existing exports would stop
-// importing). Brands set their own tag.
-export const WATCH_DESCRIPTOR_KIND = 'qbt-watch'
+// The kind tag is persisted inside exported descriptors; each brand sets its
+// own in ../brand/identifiers.
+export { WATCH_DESCRIPTOR_KIND }
 /** The version new exports are written at. Both versions are accepted on import. */
 export const WATCH_DESCRIPTOR_VERSION = 2
 

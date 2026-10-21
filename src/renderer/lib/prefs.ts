@@ -1,4 +1,5 @@
 import { useCallback, useSyncExternalStore } from 'react'
+import { ADVANCED_MODE_KEY } from '../brand/storageKeys'
 
 // User-facing display preferences — not chain data, not secrets. Persisted to
 // localStorage so they survive restarts, and exposed as a tiny external store so
@@ -8,11 +9,9 @@ import { useCallback, useSyncExternalStore } from 'react'
 
 type Listener = () => void
 
-const ADVANCED_KEY = 'wallet.advancedMode'
-
 function readAdvanced(): boolean {
   try {
-    return window.localStorage.getItem(ADVANCED_KEY) === '1'
+    return window.localStorage.getItem(ADVANCED_MODE_KEY) === '1'
   } catch {
     return false
   }
@@ -27,7 +26,7 @@ export function setAdvancedMode(value: boolean): void {
   if (value === advanced) return
   advanced = value
   try {
-    window.localStorage.setItem(ADVANCED_KEY, value ? '1' : '0')
+    window.localStorage.setItem(ADVANCED_MODE_KEY, value ? '1' : '0')
   } catch {
     // Non-fatal: the preference just won't persist across restarts.
   }
@@ -49,6 +48,7 @@ export function useAdvancedMode(): boolean {
 
 export type Theme = 'dark' | 'light'
 
+// Shared by every brand and frozen: existing installs keep the theme under it.
 const THEME_KEY = 'wallet.theme'
 
 function readTheme(): Theme {

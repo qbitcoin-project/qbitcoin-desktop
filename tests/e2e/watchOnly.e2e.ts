@@ -1,6 +1,7 @@
 import { acceptPrivacy, focusedWindow, freshUserData } from './privacyHelpers'
 import { join } from 'node:path'
 import { _electron as electron, expect, test } from '@playwright/test'
+import { WATCH_DESCRIPTOR_KIND } from '../../src/main/brand/identifiers'
 
 // The built main entry. `pnpm test:e2e` builds first, so out/ is current.
 const MAIN = join(process.cwd(), 'out', 'main', 'index.js')
@@ -33,7 +34,7 @@ test('export a descriptor, add it as a watch wallet, see it blocked, then remove
     const exported = page.getByRole('textbox', { name: 'Watch descriptor', exact: true })
     await expect(exported).toBeVisible({ timeout: 30_000 }) // Falcon address derivation is WASM
     const descriptor = await exported.inputValue()
-    expect(descriptor).toContain('qbt-watch')
+    expect(descriptor).toContain(WATCH_DESCRIPTOR_KIND)
     await page.getByRole('dialog').locator('.modal-close').click()
 
     // Accounts → add it back as a watch-only wallet.

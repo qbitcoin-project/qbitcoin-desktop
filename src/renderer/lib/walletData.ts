@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react'
 import type { Contact, HistoryItem, HistoryPage, NodeStatus, TokenBalance, TxDetail, UtxoView, WalletInfo, WalletSnapshot, WalletSummary } from '../../shared/protocol'
+import { NODE_TIP_KEY } from '../brand/storageKeys'
 import { addressPlaceholderFor, assetLabelFor } from './brandLabels'
 import { wallet } from './wallet'
 
@@ -223,20 +224,19 @@ export function networkLabel(network: 'mainnet' | 'testnet' | null): string {
 // these hooks re-render with the right value once main reports the network
 // (see lib/brandLabels for the pure readers and the mainnet fallback).
 
-/** The build's ticker for native amounts, e.g. "QBT" / "tQBT". */
+/** The build's ticker for native amounts, per network. */
 export function useAssetLabel(): string {
   return assetLabelFor(useBuildNetwork())
 }
 
-/** Placeholder for address inputs, e.g. "bq… or 3u…". */
+/** Placeholder for address inputs, per network. */
 export function useAddressPlaceholder(): string {
   return addressPlaceholderFor(useBuildNetwork())
 }
 
-// Mainnet keeps the historical key (existing installs must not lose their
-// persisted sync target); testnet gets a suffixed key so the two chains'
-// heights never mix.
-const NODE_TIP_KEY = 'wallet.tipHeight'
+// Mainnet keeps the brand's historical key (existing installs must not lose
+// their persisted sync target); testnet gets a suffixed key so the two
+// chains' heights never mix.
 function nodeTipKey(): string {
   return buildNetwork === 'testnet' ? `${NODE_TIP_KEY}.testnet` : NODE_TIP_KEY
 }

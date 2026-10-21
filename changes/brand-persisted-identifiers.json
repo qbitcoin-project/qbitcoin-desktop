@@ -1,0 +1,7 @@
+{
+  "id": "brand-persisted-identifiers",
+  "scope": "shared",
+  "type": "internal",
+  "bump": "none",
+  "text": "Read persisted storage keys and the watch descriptor tag from brand files instead of shared code."
+}

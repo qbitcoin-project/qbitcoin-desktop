@@ -2,14 +2,14 @@ import { brand } from '../../src/renderer/brand'
 import { expect, test } from '@playwright/test'
 import { launchWalletUi } from './walletUiHelpers'
 
-const QBTC = brand.assetLabel.mainnet
+const TICKER = brand.assetLabel.mainnet
 
 test('the conversion form explains rate, fee and timing as information', async () => {
   const { app, page } = await launchWalletUi()
   try {
     await page.getByRole('button', { name: 'Convert', exact: true }).click()
     const note = page.getByRole('status').filter({ hasText: 'You’ll receive' })
-    await expect(note).toHaveText(`You’ll receive ${QBTC} at the protocol rate at credit time, minus a ≈1% protocol fee, in about 3–4 hours.`)
+    await expect(note).toHaveText(`You’ll receive ${TICKER} at the protocol rate at credit time, minus a ≈1% protocol fee, in about 3–4 hours.`)
     await expect(note).toHaveAttribute('data-variant', 'note')
     await expect(page.getByText(/one-way/)).toHaveCount(0)
   } finally { await app.close() }

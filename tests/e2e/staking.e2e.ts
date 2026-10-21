@@ -2,7 +2,7 @@ import { brand } from '../../src/renderer/brand'
 import { expect, test, type Page } from '@playwright/test'
 import { launchWalletUi } from './walletUiHelpers'
 
-const QBTC = brand.assetLabel.mainnet
+const TICKER = brand.assetLabel.mainnet
 const calls = (page: Page) => page.evaluate(() => (window as unknown as { walletUiTest: { calls: { method: string; args: unknown[] }[] } }).walletUiTest.calls)
 const count = async (page: Page, method: string) => (await calls(page)).filter((c) => c.method === method).length
 const openStaking = (page: Page) => page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: 'Staking', exact: true }).click()
@@ -14,9 +14,9 @@ test('merges confirmed blockchain activity with journal operations, preserving p
     const activity = page.getByRole('region', { name: 'Activity', exact: true })
     await expect(activity.getByText('Showing 5 of 8 operations', { exact: true })).toBeVisible()
     const reward = activity.locator('.staking-op').filter({ hasText: 'Stake reward' })
-    await expect(reward).toContainText(`+0.000009 ${QBTC}`)
+    await expect(reward).toContainText(`+0.000009 ${TICKER}`)
     const withdrawal = activity.locator('.staking-op').filter({ hasText: 'Staking withdrawal' })
-    await expect(withdrawal).toContainText(`-0.00100003 ${QBTC}`)
+    await expect(withdrawal).toContainText(`-0.00100003 ${TICKER}`)
     await activity.getByRole('button', { name: 'Show more', exact: true }).click()
     await expect(activity.getByText('Showing 8 of 8 operations', { exact: true })).toBeVisible()
     await expect(activity.locator('[data-op-toggle="journal-deposit"]')).toBeFocused()
@@ -24,7 +24,7 @@ test('merges confirmed blockchain activity with journal operations, preserving p
     await expect(activity.locator('[data-op-toggle="journal-deposit"]')).toHaveCount(1)
     const missing = activity.locator('.staking-op').filter({ has: page.locator('[data-op-toggle="chain-1"]') })
     await missing.getByRole('button').first().click()
-    await expect(missing).toContainText(`+0.001 ${QBTC}`)
+    await expect(missing).toContainText(`+0.001 ${TICKER}`)
     await expect(missing.getByText(/Found in the blockchain/)).toBeVisible()
     await expect(missing.getByRole('button', { name: /Check again|retries|recovery|Delegate again/ })).toHaveCount(0)
     await expect(activity.locator('[data-op-toggle="chain-3"]')).toContainText('Time unavailable')
@@ -80,7 +80,7 @@ for (const algo of ['ECDSA', 'Falcon-512']) test(`reviews and submits ${algo} de
     await expect(dialog.getByRole('tab', { name: 'ECDSA', exact: true })).toHaveAttribute('aria-selected', 'true')
     await dialog.getByRole('tab', { name: algo, exact: true }).click()
     await expect(dialog.getByRole('tab', { name: algo, exact: true })).toHaveAttribute('aria-selected', 'true')
-    await expect(dialog.getByText(`Ordinary coins: 0.8991 ${QBTC}`, { exact: true })).toBeVisible()
+    await expect(dialog.getByText(`Ordinary coins: 0.8991 ${TICKER}`, { exact: true })).toBeVisible()
     await expect(dialog.getByRole('button', { name: 'Use whole wallet' })).toHaveCount(0)
     const amount = dialog.getByRole('textbox', { name: /^Amount to delegate/ })
     await amount.fill('0.00099999')
@@ -255,9 +255,9 @@ for (const algo of ['ECDSA', 'Falcon-512']) test(`partial ${algo} unstake shows 
     await amount.fill('0.03')
     await dialog.getByRole('button', { name: 'Review unstake', exact: true }).click()
     const review = dialog.getByRole('region', { name: 'Review unstake', exact: true })
-    await expect(review.getByText(`0.03 ${QBTC}`, { exact: true })).toBeVisible()
-    await expect(review.getByText(`0.00001 ${QBTC}`, { exact: true })).toBeVisible()
-    await expect(review.getByText(`0.07089 ${QBTC}`, { exact: true })).toBeVisible()
+    await expect(review.getByText(`0.03 ${TICKER}`, { exact: true })).toBeVisible()
+    await expect(review.getByText(`0.00001 ${TICKER}`, { exact: true })).toBeVisible()
+    await expect(review.getByText(`0.07089 ${TICKER}`, { exact: true })).toBeVisible()
     await expect(review.getByText('Ordinary change', { exact: true })).toHaveCount(0)
     expect((await calls(page)).filter((c) => c.method === 'stakingBuildWithdrawal').at(-1)?.args[0]).toMatchObject({ amountAtomic: '3000000', max: false })
     expect(await count(page, 'stakingConfirm')).toBe(0)
@@ -544,7 +544,7 @@ test('a single funded key is the summary itself and unstakes without choosing a 
   try {
     await openStaking(page)
     const summary = page.getByRole('region', { name: 'In staking', exact: true })
-    await expect(summary).toContainText(`0.1009 ${QBTC}`)
+    await expect(summary).toContainText(`0.1009 ${TICKER}`)
     await expect(summary).toContainText('ECDSA key, delegated to Test service')
     await expect(page.getByRole('region', { name: 'Delegations', exact: true })).toHaveCount(0)
     await summary.getByText('Address and details', { exact: true }).click()
@@ -576,9 +576,9 @@ test('shows five latest operations and reveals five more at a time without losin
     const activity = page.getByRole('region', { name: 'Activity', exact: true })
     const rows = activity.getByRole('listitem'), more = activity.getByRole('button', { name: 'Show more', exact: true })
     await expect(rows).toHaveCount(5)
-    await expect(rows.first()).toContainText(`0.02 ${QBTC}`)
+    await expect(rows.first()).toContainText(`0.02 ${TICKER}`)
     await expect(rows.first()).toContainText('Delegation')
-    await expect(rows.last()).toContainText(`0.016 ${QBTC}`)
+    await expect(rows.last()).toContainText(`0.016 ${TICKER}`)
     await more.scrollIntoViewIfNeeded()
     await page.screenshot({ path: 'docs/delegation-implementation/staking-five-operations.png' })
     for (const shown of [10, 15, 20]) {
@@ -589,7 +589,7 @@ test('shows five latest operations and reveals five more at a time without losin
       await expect(activity.getByRole('status').filter({ hasText: /^Showing/ })).toHaveText(`Showing ${shown} of 20 operations`)
     }
     await expect(more).toHaveCount(0)
-    await expect(rows.last()).toContainText(`0.001 ${QBTC}`)
+    await expect(rows.last()).toContainText(`0.001 ${TICKER}`)
     await page.getByRole('button', { name: 'Refresh', exact: true }).click()
     await expect(rows).toHaveCount(20)
     await rows.last().getByRole('button').first().click()
@@ -677,7 +677,7 @@ test('opening Staking shows a neutral check until the first balance read finishe
     await expect(page.getByRole('heading', { name: /^Nothing in staking/ })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Unstake', exact: true })).toHaveCount(0)
     await page.evaluate(() => (window as unknown as { walletUiTest: { releaseRefresh: () => void } }).walletUiTest.releaseRefresh())
-    await expect(page.getByRole('region', { name: 'In staking', exact: true })).toContainText(`0.2018 ${QBTC}`)
+    await expect(page.getByRole('region', { name: 'In staking', exact: true })).toContainText(`0.2018 ${TICKER}`)
   } finally { await app.close() }
 })
 
@@ -705,7 +705,7 @@ test('a new delegation appears in the summary as pending right after it is sent'
     await dialog.getByRole('button', { name: 'Confirm delegation', exact: true }).click()
     await dialog.getByRole('button', { name: 'Done', exact: true }).click()
     const summary = page.getByRole('region', { name: 'In staking', exact: true })
-    await expect(summary).toContainText(`0.1019 ${QBTC}`)
+    await expect(summary).toContainText(`0.1019 ${TICKER}`)
     await expect(summary.getByText('Pending', { exact: true }).first()).toBeVisible()
   } finally { await app.close() }
 })
