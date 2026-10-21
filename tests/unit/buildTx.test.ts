@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DUST_ATOMIC, InsufficientFundsError, InsufficientTokensError, buildSend, buildTokenSend, estimateSendFee, feeForInputs, selectCoins, type SpendableTokenUtxo, type SpendableUtxo } from '../../src/main/wallet/buildTx'
-
-// Real classical mainnet addresses (derived from the abandon…about vector), so
-// decodeAddress accepts them and produces 20-byte scripthashes.
-const RECIPIENT = 'bqhHWtW8DUJWfCvik4BgagviXbMyyNBhLnV'
-const CHANGE = 'bqaghDewzjiedo8mH7whakka5nSgRvT7Wr7'
-// A real mainnet Falcon (PQ) address — decodeAddress yields a 32-byte scripthash.
-const PQ_CHANGE = '3uHLRPLv1MZEPMWqYe73rfLhgzzC35jiD1XsFhcgnveoko1pWLN4'
+import { SAMPLE_CHANGE as CHANGE, SAMPLE_PQ_CHANGE as PQ_CHANGE, SAMPLE_RECIPIENT as RECIPIENT } from './brand/fixtures'
 
 function utxo(txid: string, vout: number, value: bigint, index = 0): SpendableUtxo {
   return { txid, vout, value, chain: 0, index, algo: 'ecdsa' }

@@ -3,9 +3,9 @@ import { activeScheme, decodeAddress, deriveFalconKeypair, nativePath, sighashCo
 import { describe, expect, it } from 'vitest'
 import type { UnsignedTx } from '../../src/main/wallet/buildTx'
 import { buildSignedTransaction, signUnsignedTx, toCryptoTransaction } from '../../src/main/wallet/signTx'
+import { SAMPLE_RECIPIENT as RECIPIENT } from './brand/fixtures'
 
 const MASTER = masterKeyFromSeed(mnemonicToSeed('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'))
-const RECIPIENT = 'bqhHWtW8DUJWfCvik4BgagviXbMyyNBhLnV'
 
 function unsigned(): UnsignedTx {
   return {

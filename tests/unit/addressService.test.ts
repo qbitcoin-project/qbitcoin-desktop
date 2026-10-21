@@ -3,6 +3,7 @@ import { activeScheme } from '../../src/main/crypto'
 import { describe, expect, it } from 'vitest'
 import { AddressService, type WalletVault } from '../../src/main/wallet/AddressService'
 import { WalletMetaStore } from '../../src/main/wallet/meta'
+import { CLASSICAL_PREFIX } from './brand/fixtures'
 
 const MASTER = masterKeyFromSeed(mnemonicToSeed('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'))
 
@@ -29,7 +30,7 @@ describe('AddressService', () => {
     const a = await service.getReceiveAddress()
     const b = await service.getReceiveAddress()
     expect(a).toBe(b)
-    expect(a.startsWith('bq')).toBe(true)
+    expect(a.startsWith(CLASSICAL_PREFIX.mainnet)).toBe(true)
   })
 
   it('advances and persists the index on a new address', async () => {

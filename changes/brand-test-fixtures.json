@@ -1,0 +1,7 @@
+{
+  "id": "brand-test-fixtures",
+  "scope": "shared",
+  "type": "internal",
+  "bump": "none",
+  "text": "Take chain-specific sample addresses in shared unit tests from brand fixtures."
+}

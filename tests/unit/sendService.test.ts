@@ -4,9 +4,7 @@ import { SendService, type SendDeps } from '../../src/main/wallet/SendService'
 import type { GatheredUtxo } from '../../src/main/wallet/spendable'
 import type { UnsignedTx } from '../../src/main/wallet/buildTx'
 import { addressFromScripthash } from '../../src/main/crypto'
-
-const RECIPIENT = 'bqhHWtW8DUJWfCvik4BgagviXbMyyNBhLnV'
-const CHANGE = 'bqaghDewzjiedo8mH7whakka5nSgRvT7Wr7'
+import { SAMPLE_CHANGE as CHANGE, SAMPLE_RECIPIENT as RECIPIENT } from './brand/fixtures'
 
 function harness(utxos: GatheredUtxo[], frozen: ReadonlySet<string> = new Set()) {
   const calls = { sign: 0, broadcast: [] as string[], advance: 0, signed: [] as UnsignedTx[] }
