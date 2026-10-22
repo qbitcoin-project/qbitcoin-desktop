@@ -9,6 +9,13 @@ import { SendService, type SendDeps } from '../../src/main/wallet/SendService'
 import { buildSend, feeForDraft, type ChangeBranch, type UnsignedTx } from '../../src/main/wallet/buildTx'
 import { buildWithChange } from '../../src/main/wallet/buildWithChange'
 import { stakingFixture, ZERO_STATS } from '../fixtures/staking'
+import type * as brandDelegation from '../../src/main/brand/delegation'
+
+// Delegated keys run on test prefixes, so this test passes in every brand.
+vi.mock('../../src/main/brand/delegation', async (original) => {
+  const { TEST_DELEGATION } = await import('../fixtures/delegationPrefixes')
+  return { ...await original<typeof brandDelegation>(), DELEGATION: TEST_DELEGATION }
+})
 
 const master = masterKeyFromSeed(mnemonicToSeed('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'))
 const recipient = addressFromScripthash(new Uint8Array(20).fill(3), 'testnet')

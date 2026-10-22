@@ -3,9 +3,13 @@ import { _electron as electron, expect, test } from '@playwright/test'
 import { delegatedKeyFixture } from '../fixtures/delegatedKey'
 import { importedKeyFromStored } from '../../src/main/wallet/keyWallet'
 import { encodeDelegatePubkeyhash } from '../../src/main/wallet/delegation'
+import { DELEGATION } from '../../src/main/brand/delegation'
 import { acceptPrivacy, focusApp, focusedWindow, freshUserData } from './privacyHelpers'
 
 test.use({ trace: 'off', screenshot: 'off', video: 'off' })
+// These scenarios run the real main process; a brand without delegated keys has
+// nothing to import here.
+test.skip(DELEGATION === null, 'this brand ships no delegated keys')
 const PASSWORD = 'delegated-test-password'
 const PRIMARY = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
 

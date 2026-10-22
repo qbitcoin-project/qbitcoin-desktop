@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { deserialize, fromHex, setSchnorrEnabled } from '@qbtc/crypto'
 import { addressFromScripthash, encodeWif } from '../../src/main/crypto'
 import { SendService } from '../../src/main/wallet/SendService'
@@ -7,6 +7,13 @@ import { decodeWalletWif } from '../../src/main/wallet/keyWif'
 import { importedKeyFromWif, keyInputBytes, ordinaryKeyAddress, signUnsignedTxWithKey, type ImportedKey } from '../../src/main/wallet/keyWallet'
 import type { GatheredUtxo } from '../../src/main/wallet/spendable'
 import { delegatedKeyFixture } from '../fixtures/delegatedKey'
+import type * as brandDelegation from '../../src/main/brand/delegation'
+
+// Delegated keys run on test prefixes, so this test passes in every brand.
+vi.mock('../../src/main/brand/delegation', async (original) => {
+  const { TEST_DELEGATION } = await import('../fixtures/delegationPrefixes')
+  return { ...await original<typeof brandDelegation>(), DELEGATION: TEST_DELEGATION }
+})
 
 const TOKEN = 'ab'.repeat(32)
 const keys = new Map<string, ImportedKey>()

@@ -1,9 +1,16 @@
 import { masterKeyFromSeed, mnemonicToSeed } from '@qbtc/crypto'
 import { activeScheme } from '../../src/main/crypto'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { AddressService, type WalletVault } from '../../src/main/wallet/AddressService'
 import { WalletMetaStore } from '../../src/main/wallet/meta'
 import { CLASSICAL_PREFIX } from './brand/fixtures'
+import type * as brandDelegation from '../../src/main/brand/delegation'
+
+// Delegated keys run on test prefixes, so this test passes in every brand.
+vi.mock('../../src/main/brand/delegation', async (original) => {
+  const { TEST_DELEGATION } = await import('../fixtures/delegationPrefixes')
+  return { ...await original<typeof brandDelegation>(), DELEGATION: TEST_DELEGATION }
+})
 
 const MASTER = masterKeyFromSeed(mnemonicToSeed('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'))
 

@@ -2,6 +2,13 @@ import { ChainError } from '@qbtc/chain'
 import { describe, expect, it, vi } from 'vitest'
 import { SpendCoordinator } from '../../src/main/wallet/SpendCoordinator'
 import { chainTx, stakingFixture } from '../fixtures/staking'
+import type * as brandDelegation from '../../src/main/brand/delegation'
+
+// Delegated keys run on test prefixes, so this test passes in every brand.
+vi.mock('../../src/main/brand/delegation', async (original) => {
+  const { TEST_DELEGATION } = await import('../fixtures/delegationPrefixes')
+  return { ...await original<typeof brandDelegation>(), DELEGATION: TEST_DELEGATION }
+})
 
 async function conflicted(kind: 'funding' | 'withdrawal') {
   const f = stakingFixture()

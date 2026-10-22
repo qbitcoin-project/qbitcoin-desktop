@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { encodeWif } from '../../src/main/crypto'
 import { encodeDelegatePubkeyhash } from '../../src/main/wallet/delegation'
 import { decodeWalletWif } from '../../src/main/wallet/keyWif'
+import { stakingFixture } from '../fixtures/staking'
 import type * as brandDelegation from '../../src/main/brand/delegation'
 
 // A brand that ships no delegated keys: every delegation value is switched off.
@@ -26,5 +27,10 @@ describe('a build without delegated keys', () => {
 
   it('refuses to encode a delegate pubkeyhash', () => {
     expect(() => encodeDelegatePubkeyhash(new Uint8Array(20), 'mainnet')).toThrow('Delegated keys are not available in this build.')
+  })
+
+  it('keeps Staking hidden', async () => {
+    const f = stakingFixture({ profiles: [] })
+    expect(await f.service.info()).toMatchObject({ enabled: false, fundingEnabled: false })
   })
 })

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   decodeBase58Check, deserialize, encodeBase58Check, fromHex, hash160, hash256,
   SchnorrDisabledError, setSchnorrEnabled, SIGHASH, sighash, toHex, verifySiglistEntry,
@@ -11,6 +11,13 @@ import { toCryptoTransaction } from '../../src/main/wallet/signTx'
 import type { UnsignedTx } from '../../src/main/wallet/buildTx'
 import { delegatedKeyFixture } from '../fixtures/delegatedKey'
 import goldens from '../fixtures/delegation.json'
+import type * as brandDelegation from '../../src/main/brand/delegation'
+
+// Delegated keys run on test prefixes, so this test passes in every brand.
+vi.mock('../../src/main/brand/delegation', async (original) => {
+  const { TEST_DELEGATION } = await import('../fixtures/delegationPrefixes')
+  return { ...await original<typeof brandDelegation>(), DELEGATION: TEST_DELEGATION }
+})
 
 describe('delegation script compatibility', () => {
   // Scripts produced by running the node's pure delegation functions against

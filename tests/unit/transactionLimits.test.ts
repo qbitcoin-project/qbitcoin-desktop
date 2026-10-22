@@ -3,6 +3,13 @@ import { describe, expect, it, vi } from 'vitest'
 import { assertBroadcastSize, MAX_BROADCAST_BYTES } from '../../src/main/wallet/transactionLimits'
 import { validateDelegationJournal } from '../../src/main/wallet/delegationStore'
 import { stakingFixture } from '../fixtures/staking'
+import type * as brandDelegation from '../../src/main/brand/delegation'
+
+// Delegated keys run on test prefixes, so this test passes in every brand.
+vi.mock('../../src/main/brand/delegation', async (original) => {
+  const { TEST_DELEGATION } = await import('../fixtures/delegationPrefixes')
+  return { ...await original<typeof brandDelegation>(), DELEGATION: TEST_DELEGATION }
+})
 
 describe('wallet and installed SDK broadcast limit', () => {
   it.each([100_001, 2 * 1024 * 1024 - 1, 2 * 1024 * 1024])('accepts %i serialized bytes and preserves the complete HTTP body', async (bytes) => {

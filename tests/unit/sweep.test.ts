@@ -1,10 +1,17 @@
 import type { AddressInfo, Utxo } from '@qbtc/chain'
 import { deserialize, fromHex, getPublicKey, scriptP2PK, SIGHASH, sighash, toHex, verifySiglistEntry } from '@qbtc/crypto'
 import { addressFromPubkey, decodeAddress, encodeWif, sighashCommitsTokenId } from '../../src/main/crypto'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { importedKeyFromStored, ordinaryKeyAddress, type ImportedKey } from '../../src/main/wallet/keyWallet'
 import { createSweepSession, type SweepBackend } from '../../src/main/wallet/sweep'
 import { delegatedKeyFixture } from '../fixtures/delegatedKey'
+import type * as brandDelegation from '../../src/main/brand/delegation'
+
+// Delegated keys run on test prefixes, so this test passes in every brand.
+vi.mock('../../src/main/brand/delegation', async (original) => {
+  const { TEST_DELEGATION } = await import('../fixtures/delegationPrefixes')
+  return { ...await original<typeof brandDelegation>(), DELEGATION: TEST_DELEGATION }
+})
 
 // A real ECDSA key so the session derives, signs and serializes for real —
 // only the chain is faked.

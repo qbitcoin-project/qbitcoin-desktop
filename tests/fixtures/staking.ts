@@ -1,9 +1,9 @@
 import { ChainError, type AddressInfo, type ChainTx, type Outspend, type Utxo } from '@qbtc/chain'
-import { deserialize, fromHex, getPublicKey, toHex, txid } from '@qbtc/crypto'
+import { deserialize, encodeBase58Check, fromHex, getPublicKey, toHex, txid } from '@qbtc/crypto'
 import { vi } from 'vitest'
 import { addressFromPubkey, decodeAddress } from '../../src/main/crypto'
 import type { DelegateProfile } from '../../src/main/wallet/delegationTypes'
-import { encodeDelegatePubkeyhash } from '../../src/main/wallet/delegation'
+import { TEST_DELEGATION } from './delegationPrefixes'
 import { DelegationService, type StakingReader, type StakingWallet } from '../../src/main/wallet/DelegationService'
 import { emptyDelegationJournal, type DelegationJournal, type DelegationStore } from '../../src/main/wallet/delegationStore'
 import { signUnsignedTxWithKey } from '../../src/main/wallet/keyWallet'
@@ -11,10 +11,14 @@ import type { GatheredUtxo } from '../../src/main/wallet/spendable'
 import { SpendCoordinator } from '../../src/main/wallet/SpendCoordinator'
 
 export const ZERO_STATS = { fundedTxCount: 0, fundedSum: 0n, spentTxCount: 0, spentSum: 0n }
+// Encoded with the test prefixes directly, so importing this fixture never needs
+// the brand's delegation values.
+const testServiceHash = (fill: number, length: 20 | 32) =>
+  encodeBase58Check(TEST_DELEGATION.testnet.pubkeyhashMagic, new Uint8Array(length).fill(fill))
 export const stakingProfile: DelegateProfile = {
   id: 'test-service', label: 'Test service', network: 'testnet', status: 'active',
   minimumAtomic: '10000000', minimumVerified: true, commission: '5%', fundingEnabled: true,
-  hashes: { ecdsa: encodeDelegatePubkeyhash(new Uint8Array(20).fill(10), 'testnet'), falcon512: encodeDelegatePubkeyhash(new Uint8Array(32).fill(11), 'testnet') },
+  hashes: { ecdsa: testServiceHash(10, 20), falcon512: testServiceHash(11, 32) },
 }
 export const missingTx = (): ChainError => new ChainError('http_4xx', 'Not found', { status: 404 })
 export function chainTx(id: string, patch: Partial<ChainTx> = {}): ChainTx {

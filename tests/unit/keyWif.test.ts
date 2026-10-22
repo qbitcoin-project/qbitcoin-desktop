@@ -6,6 +6,13 @@ import { decodeWalletWif } from '../../src/main/wallet/keyWif'
 import { importedKeyFromStored, importedKeyFromWif } from '../../src/main/wallet/keyWallet'
 import { encodeDelegatePubkeyhash } from '../../src/main/wallet/delegation'
 import { delegatedKeyFixture } from '../fixtures/delegatedKey'
+import type * as brandDelegation from '../../src/main/brand/delegation'
+
+// Delegated keys run on test prefixes, so this test passes in every brand.
+vi.mock('../../src/main/brand/delegation', async (original) => {
+  const { TEST_DELEGATION } = await import('../fixtures/delegationPrefixes')
+  return { ...await original<typeof brandDelegation>(), DELEGATION: TEST_DELEGATION }
+})
 
 vi.mock('@qbtc/crypto', async (original) => {
   const actual = await original<typeof crypto>()

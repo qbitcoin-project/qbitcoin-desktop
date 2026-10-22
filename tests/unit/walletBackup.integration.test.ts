@@ -11,6 +11,13 @@ import { descriptorSchemes, parseWatchDescriptor } from '../../src/main/wallet/w
 import { SensitiveSessionError } from '../../src/shared/privacy'
 import type { WalletBackup } from '../../src/shared/protocol'
 import { delegatedKeyFixture } from '../fixtures/delegatedKey'
+import type * as brandDelegation from '../../src/main/brand/delegation'
+
+// Delegated keys run on test prefixes, so this test passes in every brand.
+vi.mock('../../src/main/brand/delegation', async (original) => {
+  const { TEST_DELEGATION } = await import('../fixtures/delegationPrefixes')
+  return { ...await original<typeof brandDelegation>(), DELEGATION: TEST_DELEGATION }
+})
 
 const PRIMARY = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
 const IMPORTED = 'legal winner thank year wave sausage worth useful legal winner thank yellow'

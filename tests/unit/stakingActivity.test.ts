@@ -6,6 +6,13 @@ import { StakingHistory } from '../../src/main/wallet/StakingHistory'
 import { mergeStakingActivity } from '../../src/renderer/lib/stakingView'
 import type { StakingChainActivity, StakingOperationView } from '../../src/shared/staking'
 import { chainTx, stakingFixture } from '../fixtures/staking'
+import type * as brandDelegation from '../../src/main/brand/delegation'
+
+// Delegated keys run on test prefixes, so this test passes in every brand.
+vi.mock('../../src/main/brand/delegation', async (original) => {
+  const { TEST_DELEGATION } = await import('../fixtures/delegationPrefixes')
+  return { ...await original<typeof brandDelegation>(), DELEGATION: TEST_DELEGATION }
+})
 
 const address = 'staking-owner', hash = 'ab'.repeat(20)
 const input = (value: bigint, patch: Partial<ChainTxIn> = {}): ChainTxIn => ({ txid: 'previous', vout: 0, prevoutValue: value, prevoutAddress: address, prevoutScripthash: hash, ...patch })

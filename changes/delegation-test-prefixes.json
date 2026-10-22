@@ -1,0 +1,7 @@
+{
+  "id": "delegation-test-prefixes",
+  "scope": "shared",
+  "type": "internal",
+  "bump": "none",
+  "text": "Run delegated-key tests on test prefixes so the shared suite passes in a brand without delegated keys."
+}

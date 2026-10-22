@@ -15,7 +15,8 @@ import type * as brandDelegation from '../../src/main/brand/delegation'
 
 vi.mock('../../src/main/brand/delegation', async (original) => {
   const { TEST_STAKING_DERIVATION } = await import('../fixtures/stakingDerivation')
-  return { ...await original<typeof brandDelegation>(), STAKING_DERIVATIONS: [TEST_STAKING_DERIVATION] }
+  const { TEST_DELEGATION } = await import('../fixtures/delegationPrefixes')
+  return { ...await original<typeof brandDelegation>(), STAKING_DERIVATIONS: [TEST_STAKING_DERIVATION], DELEGATION: TEST_DELEGATION }
 })
 
 const funding = { algo: 'ecdsa' as const, amountAtomic: '10000000' }
