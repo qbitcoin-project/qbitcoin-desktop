@@ -1,0 +1,7 @@
+{
+  "id": "testnet-ticker-aliases",
+  "scope": "shared",
+  "type": "internal",
+  "bump": "none",
+  "text": "Treat both tickers and the explorer domain as brand names in the release and brand checks."
+}

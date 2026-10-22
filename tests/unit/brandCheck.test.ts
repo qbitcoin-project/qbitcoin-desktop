@@ -96,4 +96,14 @@ describe('brand separation check', () => {
     write('src/new.ts', 'export const fresh = \'North\'\n')
     fails('src/new.ts:1: brand name "North"')
   })
+
+  it('finds a testnet ticker only when it is listed as an alias', () => {
+    write('src/e.ts', 'export const fee = \'0.1 tNRT\'\n')
+    passes()
+    writeJson('release.config.json', {
+      schemaVersion: 1, brand: 'north', releaseBranch: 'north', tagPrefix: 'north-v', packageName: 'north-wallet',
+      productName: 'North Wallet', aliases: ['North', 'NRT', 'tNRT', 'northscan.org'], upstreamScopes: [],
+    })
+    fails('src/e.ts:1: brand name "tNRT"')
+  })
 })
