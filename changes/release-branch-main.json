@@ -1,0 +1,7 @@
+{
+  "id": "release-branch-main",
+  "scope": "shared",
+  "type": "internal",
+  "bump": "none",
+  "text": "Prepare and record releases from the main branch."
+}

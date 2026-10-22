@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "brand": "qbitcoin",
-  "releaseBranch": "release",
+  "releaseBranch": "main",
   "tagPrefix": "qbtc-v",
   "packageName": "qbitcoin-wallet-desktop",
   "productName": "QBitcoin Wallet",
