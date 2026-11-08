@@ -17,6 +17,7 @@
   },
   "files": ["dist/beta-app/**/*", "package.json"],
   "mac": {
+    "minimumSystemVersion": "13.0.0",
     "target": [
       { "target": "dmg", "arch": ["arm64"] },
       { "target": "zip", "arch": ["arm64"] }

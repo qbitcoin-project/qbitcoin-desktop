@@ -17,12 +17,15 @@ directories:
   output: release
   buildResources: resources
 
+beforePack: ./build/mac-update-info.cjs
+
 # electron-vite compiles the app into out/ before packaging.
 files:
   - out/**/*
   - package.json
 
 mac:
+  minimumSystemVersion: "13.0.0"
   target:
     - dmg
     - zip

@@ -85,7 +85,7 @@ export function App() {
     return startActivityReporting()
   }, [route])
 
-  let screen: ReactNode = null
+  let screen: ReactNode
   switch (route) {
     case 'wallet':
       screen = <WalletShell collapsed={collapsed} />

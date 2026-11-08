@@ -694,7 +694,7 @@ export function createWalletCore(): WalletCore {
     })
     const name = label.trim()
     registry.add({ id, kind: 'key', label: name === '' ? 'Imported key' : name, createdAt: Date.now() })
-    clearImportedKeyClipboard(clipboard, cleanWif)
+    await clearImportedKeyClipboard(clipboard, cleanWif)
     return listWallets()
   }
 

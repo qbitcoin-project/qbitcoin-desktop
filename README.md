@@ -13,8 +13,8 @@ The decrypted seed lives only in the Electron **main** process; the **renderer**
 
 ## Prerequisites
 
-- **Node 22** — `nvm use` reads [`.nvmrc`](./.nvmrc). On Windows use nvm-windows or the Node 22 installer.
-- **pnpm 10** — enable via Corepack: `corepack enable`.
+- **Node 22.13 or later in the 22.x series** — `nvm use` reads [`.nvmrc`](./.nvmrc). On Windows use nvm-windows or the Node 22 installer.
+- **pnpm 10.34.7** — enable via Corepack: `corepack enable`. The version is pinned in `package.json`.
 - **Git**.
 - To build platform installers: build each OS's installer on that OS (or a matching CI runner) — see "Package installers".
 

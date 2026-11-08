@@ -260,7 +260,7 @@ export class UpgradeService {
     const seen = new Set<string>()
     // One tip read per refresh gives every confirmed episode its depth; a
     // failed read just omits the confirmation counters (cosmetic).
-    let tip: number | null = null
+    let tip: number | null
     try {
       tip = await this.chain.tipHeight()
     } catch {
