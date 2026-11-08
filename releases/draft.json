@@ -1,1 +1,54 @@
-null
+{
+  "version": "1.7.0",
+  "date": "2026-11-08",
+  "tag": "qbtc-v1.7.0",
+  "origin": "notes",
+  "changes": [
+    {
+      "id": "brand-folder-values",
+      "hash": "67efa8f29abaed41ced73950ca040acd1c283f8f3d585bc4662428ddee081f0b"
+    },
+    {
+      "id": "brand-persisted-identifiers",
+      "hash": "cdf88b8accac5bab8d09aa0ddb524281f4df31ed8fdcdf819d9796a19ee3749e"
+    },
+    {
+      "id": "brand-separation-check",
+      "hash": "cb012c0373581114004c48095dc97987835156ecb037c6ec5089bad6b0ef86b3"
+    },
+    {
+      "id": "brand-test-fixtures",
+      "hash": "6f1d194354a356f2056ee344d1298f02fa5c4a077ddb95447d54400ca07a6340"
+    },
+    {
+      "id": "delegation-test-prefixes",
+      "hash": "79e664fe5cb516b366c890313b3b6d661d585681f583996814fd54fd4ef537d1"
+    },
+    {
+      "id": "desktop-runtime-refresh",
+      "hash": "720572e563994ee398e3df58ade789d965c6de1aea825eaba0f651be8bcfb5cc"
+    },
+    {
+      "id": "explicit-test-build-switch",
+      "hash": "46643e38841335879e3bb2a43a4597c912c2041a69d3602e4e8068d2e65ba20a"
+    },
+    {
+      "id": "optional-delegated-keys",
+      "hash": "5c28413bed650df99e2e1057e10180d2862f9b46f50483702fdd667ea62a2acd"
+    },
+    {
+      "id": "release-branch-main",
+      "hash": "629f67f013108b58a374c695a5ed9147f66d14d259ec46b8348127ab8deeeadf"
+    },
+    {
+      "id": "testnet-ticker-aliases",
+      "hash": "d8e26c7c21671b452b7cb0f01e5c222b9f6d8ea314827e0d204a92f443e85f90"
+    },
+    {
+      "id": "upstream-note-scopes",
+      "hash": "21df3e55ccf4aaed8beb2a00a756315a6cc6e348533b15d5f6db0a4a8c53b772"
+    }
+  ],
+  "body": "### Changed\n\n- The desktop app now requires macOS 13 Ventura or later. Automatic updates respect this minimum system requirement.",
+  "sourceDigest": "264a38a463b5a793b7832ff30f3f5f2046fcf3b23ee67a53b588648c555817ab"
+}

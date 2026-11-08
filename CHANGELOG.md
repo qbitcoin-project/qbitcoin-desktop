@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.0 — 2026-11-08
+
+### Changed
+
+- The desktop app now requires macOS 13 Ventura or later. Automatic updates respect this minimum system requirement.
+
 ## 1.6.0 — 2026-10-20
 
 ### Added
