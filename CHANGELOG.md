@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.0 — 2026-11-23
+
+### Added
+
+- Unlock your wallet with Touch ID on a compatible Mac. Enable it after entering your wallet password or later in Settings. You can use your password at any time and set up Touch ID again if your fingerprints change.
+
 ## 1.7.0 — 2026-11-08
 
 ### Changed
