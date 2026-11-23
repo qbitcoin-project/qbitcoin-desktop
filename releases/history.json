@@ -2,6 +2,27 @@
   "schemaVersion": 1,
   "releases": [
     {
+      "version": "1.8.0",
+      "date": "2026-11-23",
+      "tag": "qbtc-v1.8.0",
+      "origin": "notes",
+      "changes": [
+        {
+          "id": "macos-device-wallet-unlock",
+          "hash": "04d168a95a96ab76e9322c0f8eaa4cb5e907458228c1e59436ab638c86e4e5dd"
+        },
+        {
+          "id": "macos-touch-id-prototype",
+          "hash": "d7ddd8d1b9cafaa1550717f4bad3a7e987292043e3dc4a4e458b654816092765"
+        },
+        {
+          "id": "published-device-unlock-dependencies",
+          "hash": "efaaf8953f1f4f85fc909a0632ad109dd5b0386479d02aa566e8380e844e62f4"
+        }
+      ],
+      "body": "### Added\n\n- Unlock your wallet with Touch ID on a compatible Mac. Enable it after entering your wallet password or later in Settings. You can use your password at any time and set up Touch ID again if your fingerprints change."
+    },
+    {
       "version": "1.7.0",
       "date": "2026-11-08",
       "tag": "qbtc-v1.7.0",
