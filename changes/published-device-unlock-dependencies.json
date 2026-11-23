@@ -1,0 +1,7 @@
+{
+  "id": "published-device-unlock-dependencies",
+  "scope": "shared",
+  "type": "internal",
+  "bump": "none",
+  "text": "Build device unlock with the published crypto and vault packages pinned in the desktop lockfile."
+}

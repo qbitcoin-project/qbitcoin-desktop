@@ -1,14 +1,13 @@
 {
-  "date": "2026-10-19",
+  "date": "2026-11-20",
   "blocks": [
     { "kind": "paragraph", "text": "This test build uses separate wallet storage, starts on testnet on first launch, and does not check for or install updates. Install subsequent test builds manually." },
-    { "kind": "heading", "text": "Delegated staking" },
+    { "kind": "heading", "text": "Touch ID for the macOS testnet wallet" },
     { "kind": "list", "items": [
-      "Delegate ordinary coins with a dedicated ECDSA or Falcon owner key. Registration is submitted through the blockchain, without a separate service API.",
-      "Track staking balances and operations. Unstake a chosen amount or use Max; the remainder stays delegated. Send spends only ordinary coins.",
-      "Recover uncertain submissions with explicit recovery transfers and continue observing conflicts after chain reorganizations.",
-      "Deposits start at 0.001 coins on mainnet and testnet, subject to service acceptance.",
-      "The published chain SDK supports transactions up to 2 MiB. Larger staking maximum transfers are split into separately reviewed parts."
+      "In the Touch ID edition, set up fingerprint unlock before the wallet opens. After entering your password or completing wallet setup, choose Enable Touch ID and touch the sensor, or choose Later.",
+      "macOS handles fingerprint retries. If authentication fails, enter your wallet password. You can also choose Use password at any time.",
+      "During a Touch ID lockout, Settings explains how to restore access with your Mac account password. If the wallet's fingerprint enrollment is no longer valid, choose Set up Touch ID again in Settings.",
+      "Turning off fingerprint unlock requires a fresh Touch ID check, or your wallet password if Touch ID is unavailable."
     ] }
   ]
 }

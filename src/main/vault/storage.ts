@@ -7,6 +7,7 @@ import type { VaultStorage } from '@qbtc/vault'
 // this layer only moves bytes to and from a file under the app's userData dir.
 // Writes are atomic (temp file + rename) and the file is owner-only (0600).
 export class FileVaultStorage implements VaultStorage {
+  beforeReplace?: () => void
   constructor(private readonly file: string) {}
 
   async read(): Promise<string | null> {
@@ -30,6 +31,7 @@ export class FileVaultStorage implements VaultStorage {
       check()
       await fs.writeFile(tmp, blob, { encoding: 'utf8', mode: 0o600 })
       check()
+      this.beforeReplace?.()
       await fs.rename(tmp, this.file)
     } finally {
       await fs.unlink(tmp).catch(() => {})
@@ -38,6 +40,7 @@ export class FileVaultStorage implements VaultStorage {
 
   async clear(): Promise<void> {
     try {
+      this.beforeReplace?.()
       await fs.unlink(this.file)
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err

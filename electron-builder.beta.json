@@ -12,7 +12,7 @@
   "extraMetadata": {
     "name": "qbitcoin-wallet-desktop-test",
     "productName": "QBitcoin Wallet Test",
-    "version": "1.6.0-beta.3",
+    "version": "1.8.0-beta.1",
     "main": "./dist/beta-app/main/index.js"
   },
   "files": ["dist/beta-app/**/*", "package.json"],

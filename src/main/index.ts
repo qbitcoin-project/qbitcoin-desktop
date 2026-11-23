@@ -10,12 +10,18 @@ import { protectSensitiveWindow } from './privacy/windowLifecycle'
 import { registerWalletIpc } from './ipc/router'
 import { buildAppMenu } from './menu'
 import { createWalletCore } from './vault'
+import { registerWalletTouchId } from './touchId/walletIpc'
 import { configureFalconWasm } from './wallet/falconWasm'
 import { initAutoUpdater } from './updater'
 import { configureTestStorage } from './testBuild'
 import { isAppNavigation, isSafeExternalUrl, isTrustedRendererDocument, rendererDevUrl as getRendererDevUrl } from './windowSecurity'
 
 configureTestStorage(app)
+declare const __WALLET_TOUCH_ID__: boolean
+const touchIdWallet = process.platform === 'darwin' && typeof __WALLET_TOUCH_ID__ !== 'undefined' && __WALLET_TOUCH_ID__
+const primary = !touchIdWallet || app.requestSingleInstanceLock()
+if (!primary) app.quit()
+else if (touchIdWallet) app.on('second-instance', () => BrowserWindow.getAllWindows()[0]?.focus())
 
 // electron-vite sets this only while running `dev` (renderer served with HMR).
 const rendererDevUrl = getRendererDevUrl(app.isPackaged, process.env['ELECTRON_RENDERER_URL'])
@@ -111,9 +117,9 @@ function createWindow(lockVault: () => void, cancelSensitiveScan: (sessionId: st
   return win
 }
 
-app
+if (primary) app
   .whenReady()
-  .then(() => {
+  .then(async () => {
     applyProductionCsp()
 
     // Apply window/navigation hardening to every webContents. Registered before
@@ -131,8 +137,10 @@ app
     setSchnorrEnabled(true)
 
     // The Vault lives here, in main — sole owner of the decrypted seed.
-    const { vault, orchestrator, cancelSensitiveScan } = createWalletCore()
-    registerWalletIpc(orchestrator, { isTrustedSender: trustedIpcSender, sessions: sensitiveSessions, getVaultStatus: () => vault.getStatus() })
+    const core = createWalletCore()
+    const { vault, orchestrator, cancelSensitiveScan } = core
+    const afterPasswordEntry = touchIdWallet ? await registerWalletTouchId(core, win => showWindows.has(win.id), appFileUrl) : undefined
+    registerWalletIpc(orchestrator, { isTrustedSender: trustedIpcSender, sessions: sensitiveSessions, getVaultStatus: () => vault.getStatus(), afterPasswordEntry })
     const lockVault = (): void => { vault.lock() }
     // The Help menu also works while locked, hidden, or without a macOS window.
     Menu.setApplicationMenu(buildAppMenu(() => {

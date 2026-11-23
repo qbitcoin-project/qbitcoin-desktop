@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron'
+import { app, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { fail, WALLET_CHANNEL, ok, type VaultRequest, type VaultStatus } from '../../shared/protocol'
 import { PRIVACY_CHANNEL, SensitiveSessionError } from '../../shared/privacy'
 import { handlePrivacy, trustedDocument } from '../privacy/ipc'
@@ -9,6 +9,8 @@ export interface WalletIpcOptions {
   readonly isTrustedSender: (frameUrl: string) => boolean
   readonly sessions: SensitiveSessionManager
   readonly getVaultStatus: () => VaultStatus | Promise<VaultStatus>
+  /** Capture the requesting document, then prepare enrollment only on successful entry. */
+  readonly afterPasswordEntry?: (event: IpcMainInvokeEvent) => ((password: string) => Promise<void>) | undefined
 }
 
 export function registerWalletIpc(orchestrator: VaultOrchestrator, opts: WalletIpcOptions): void {
@@ -60,6 +62,15 @@ export function registerWalletIpc(orchestrator: VaultOrchestrator, opts: WalletI
       if (req.type === 'wallets.exportPublicData' && (typeof req.walletId !== 'string' || !req.walletId)) throw new Error('Malformed public export request.')
       if (['vault.lock', 'vault.destroy', 'vault.create', 'vault.changePassword', 'wallets.restore', 'wallets.switch', 'wallets.remove', 'network.set'].includes(req.type)) {
         sessions.revokeAll('context')
+      }
+      if (opts.afterPasswordEntry && (req.type === 'vault.create' || req.type === 'vault.unlock')) {
+        const prepare = opts.afterPasswordEntry(event)
+        const result = await orchestrator.handle(req)
+        if (result.ok && prepare) {
+          // Optional enrollment cannot turn a successful password login into an error.
+          await prepare(req.password).catch(() => {})
+        }
+        return result
       }
       return await orchestrator.handle(req)
     } catch (error) { return fail(error) }

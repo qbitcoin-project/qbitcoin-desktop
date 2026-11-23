@@ -1,0 +1,7 @@
+{
+  "id": "macos-device-wallet-unlock",
+  "scope": "qbitcoin",
+  "type": "added",
+  "bump": "minor",
+  "text": "Unlock your wallet with Touch ID on a compatible Mac. Enable it after entering your wallet password or later in Settings. You can use your password at any time and set up Touch ID again if your fingerprints change."
+}

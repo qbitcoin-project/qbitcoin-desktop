@@ -17,7 +17,9 @@ directories:
   output: release
   buildResources: resources
 
-beforePack: ./build/mac-update-info.cjs
+beforePack: ./build/mac-wallet-release.mjs
+afterPack: ./build/mac-wallet-release.mjs
+afterSign: ./build/mac-wallet-release.mjs
 
 # electron-vite compiles the app into out/ before packaging.
 files:
@@ -40,8 +42,14 @@ mac:
   # (electron-builder.test.yml) for unsigned ad-hoc test builds.
   hardenedRuntime: true
   gatekeeperAssess: false
-  entitlements: resources/entitlements.mac.plist
-  entitlementsInherit: resources/entitlements.mac.plist
+  forceCodeSigning: true
+  preAutoEntitlements: false
+  entitlements: dist/macos-wallet-signing/entitlements.plist
+  entitlementsInherit: resources/entitlements.touch-id.plist
+  provisioningProfile: dist/macos-wallet-signing/wallet.provisionprofile
+  extraResources:
+    - from: dist/macos-wallet-signing/touch-id-wallet.node
+      to: touch-id-wallet.node
   notarize: true
 
 win:

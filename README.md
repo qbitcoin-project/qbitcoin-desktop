@@ -79,12 +79,11 @@ Notes:
   macOS, Windows on Windows. Cross-building a Windows installer from macOS/Linux
   is technically possible with electron-builder, but native (or CI) builds are
   more reliable and are required once signing is added.
-- **No native modules.** The dependencies are pure JavaScript/WASM, so there are
-  no per-platform native rebuilds — which makes cross-platform packaging simpler
-  than a typical Electron app.
-- **Unsigned by default.** Installers run with an OS warning (macOS Gatekeeper /
-  Windows SmartScreen). Code signing — macOS Developer ID + notarization, Windows
-  EV certificate or Azure Trusted Signing — is configured in a later step.
+- **macOS signing and Touch ID.** Set `WALLET_TOUCH_ID_PROFILE` to the
+  Developer ID provisioning profile for the stable bundle ID. The release
+  build compiles the native Touch ID module for Apple Silicon and Intel and
+  requires Developer ID signing and notarization credentials. See the
+  [macOS release instructions](native/macos-touch-id/RELEASE.md).
 - **Icons** (optional): drop `icon.icns` (mac), `icon.ico` (win), and/or
   `icon.png` (linux) into [`resources/`](./resources) for branded installers;
   electron-builder picks them up automatically.

@@ -1,0 +1,7 @@
+{
+  "id": "macos-touch-id-prototype",
+  "scope": "shared",
+  "type": "internal",
+  "bump": "none",
+  "text": "Add a signed macOS Touch ID prototype with a dedicated bundle identifier and provisioning profile, a 30-second request limit and a diagnostic log for test-key access and sample transfer approval."
+}

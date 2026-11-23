@@ -1,0 +1,18 @@
+@import '@fontsource-variable/inter';
+:root { color-scheme: light dark; font: 100% / 1.5 'Inter Variable', system-ui, sans-serif; color: CanvasText; background: Canvas; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { width: min(100%, 50rem); margin-inline: auto; padding: 2rem; }
+h1 { font-size: 2rem; letter-spacing: -.04em; margin: 0; }
+h2 { font-size: 1.15rem; margin: 0 0 .6rem; }
+header p, section p { margin: .35rem 0 .75rem; }
+section { border-block-start: 1px solid color-mix(in srgb, CanvasText 20%, Canvas); padding-block: 1rem; }
+dl { display: grid; grid-template-columns: 9rem 1fr; margin: .5rem 0 1rem; }
+dd { margin: 0; }
+.actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+button { font: inherit; font-size: .9rem; padding: .45rem .85rem; border-radius: .4rem; border: 1px solid GrayText; background: ButtonFace; color: ButtonText; }
+button.primary { background: #225635; color: white; }
+button:disabled { opacity: .5; }
+button:focus-visible { outline: 3px solid Highlight; outline-offset: 2px; }
+footer { background: color-mix(in srgb, CanvasText 6%, Canvas); padding: .8rem 1rem; border-radius: .5rem; }
+footer p { margin: 0; }

@@ -53,6 +53,10 @@ export class RestorableVault extends Vault {
     return result
   }
 
+  runDeviceOperation(operation: (check: () => void) => Promise<void>): Promise<void> {
+    return this.mutate(operation)
+  }
+
   override create(mnemonic: string, password: string): Promise<void> {
     return this.mutate(() => super.create(mnemonic, password))
   }

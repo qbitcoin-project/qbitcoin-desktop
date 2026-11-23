@@ -192,11 +192,11 @@ describe('release automation CLI', () => {
     expect(readJson(fixture.root, 'releases/draft.json')).toBeNull()
   })
 
-  it('requires preparation again after source changes', () => {
+  it.each(['src/history.ts', 'native/macos/device.mm'])('requires preparation again after changes to %s', (path) => {
     const fixture = createFixture()
     add(fixture)
     prepare(fixture)
-    write(fixture.root, 'src/history.ts', 'export const historyEnabled = false\n')
+    write(fixture.root, path, '// Changed build input\n')
     fails(fixture, ['check', '--strict'], /source changed|stale/i)
     prepare(fixture)
     succeeds(fixture, 'check', '--strict')

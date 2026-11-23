@@ -1,3 +1,4 @@
+import { TouchIdSettings, refreshTouchId } from '../components/WalletTouchId'
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import type { Contact, NodeKind, NodeSettings, WalletBackup, WalletInfo, WalletPublicData } from '../../shared/protocol'
 import { PrivacyNote, SensitiveContent } from '../components/SensitiveContent'
@@ -522,6 +523,7 @@ function SecurityCard() {
       <Row title="Change password" detail="Update the password that unlocks this device."
         action={<Button variant="secondary" size="sm" onClick={() => setChangeOpen(true)}>Change</Button>} />
       <ChangePasswordModal open={changeOpen} onClose={() => setChangeOpen(false)} />
+      {window.walletTouchId && <TouchIdSettings />}
     </SectionCard>
   )
 }
@@ -664,6 +666,7 @@ function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
     setError(null)
     try {
       await wallet.changePassword(current, next)
+      refreshTouchId()
       if (!operation.current()) return
       setCurrent(''); setNext(''); setConfirm('')
       onClose()

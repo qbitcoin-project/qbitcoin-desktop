@@ -10,6 +10,7 @@ import { brand } from './brand'
 import { ChevLeftIcon, ChevRightIcon, TitleBar } from './ui'
 import { UpdateBanner } from './components/UpdateBanner'
 import { Changelog } from './components/Changelog'
+import { TouchIdEntry } from './components/WalletTouchId'
 import { Onboarding } from './screens/Onboarding'
 import { Unlock } from './screens/Unlock'
 import { WalletShell } from './screens/WalletShell'
@@ -22,7 +23,7 @@ import { WalletShell } from './screens/WalletShell'
 // NOT auto-route on 'unlocked'/'empty': those happen as a side effect of
 // create()/unlock() mid-flow, and routing on them would skip the onboarding
 // "Done" screen — so those transitions are driven by explicit callbacks.
-type Route = 'boot' | 'onboarding' | 'unlock' | 'wallet'
+type Route = 'boot' | 'onboarding' | 'unlock' | 'touch-id' | 'wallet'
 
 function routeForStatus(status: VaultStatus): Route {
   return status === 'unlocked' ? 'wallet' : status === 'locked' ? 'unlock' : 'onboarding'
@@ -30,6 +31,7 @@ function routeForStatus(status: VaultStatus): Route {
 
 export function App() {
   const [route, setRoute] = useState<Route>('boot')
+  const [lockRevision, setLockRevision] = useState(0)
   // Persisted preference (see lib/prefs), not component state: a restart must
   // not silently drop the user's choice back to dark.
   const theme = useTheme()
@@ -56,7 +58,10 @@ export function App() {
         if (active) setRoute('onboarding')
       })
     const unsubscribe = wallet.onStatusChanged((status) => {
-      if (active && status === 'locked') setRoute('unlock')
+      if (active && status === 'locked') {
+        setLockRevision(value => value + 1)
+        setRoute('unlock')
+      }
     })
     return () => {
       active = false
@@ -85,16 +90,20 @@ export function App() {
     return startActivityReporting()
   }, [route])
 
+  const enter = (offer = false) => setRoute(offer ? 'touch-id' : 'wallet')
   let screen: ReactNode
   switch (route) {
     case 'wallet':
       screen = <WalletShell collapsed={collapsed} />
       break
+    case 'touch-id':
+      screen = <TouchIdEntry onContinue={() => setRoute('wallet')} />
+      break
     case 'unlock':
-      screen = <Unlock onUnlocked={() => setRoute('wallet')} />
+      screen = <Unlock key={lockRevision} onUnlocked={enter} />
       break
     case 'onboarding':
-      screen = <Onboarding onComplete={() => setRoute('wallet')} />
+      screen = <Onboarding onComplete={enter} />
       break
     default:
       screen = null

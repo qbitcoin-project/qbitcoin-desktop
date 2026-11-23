@@ -1,4 +1,19 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { WALLET_TOUCH_ID_CHANNEL, type WalletTouchIdApi } from '../shared/walletTouchId'
+
+declare const __WALLET_TOUCH_ID__: boolean
+if (process.platform === 'darwin' && typeof __WALLET_TOUCH_ID__ !== 'undefined' && __WALLET_TOUCH_ID__) {
+  const device: WalletTouchIdApi = {
+    status: () => ipcRenderer.invoke(WALLET_TOUCH_ID_CHANNEL, 'status'),
+    later: () => ipcRenderer.invoke(WALLET_TOUCH_ID_CHANNEL, 'later'),
+    enable: password => ipcRenderer.invoke(WALLET_TOUCH_ID_CHANNEL, 'enable', password),
+    enableAtEntry: () => ipcRenderer.invoke(WALLET_TOUCH_ID_CHANNEL, 'enableAtEntry'),
+    disable: password => ipcRenderer.invoke(WALLET_TOUCH_ID_CHANNEL, 'disable', password),
+    unlock: () => ipcRenderer.invoke(WALLET_TOUCH_ID_CHANNEL, 'unlock'),
+    cancel: () => ipcRenderer.invoke(WALLET_TOUCH_ID_CHANNEL, 'cancel'),
+  }
+  contextBridge.exposeInMainWorld('walletTouchId', device)
+}
 import type { BridgeApi } from '../shared/bridge'
 import type { StakingInfo, StakingPreview, StakingResult, StakingSnapshot } from '../shared/staking'
 import { SHOW_CHANGELOG_CHANNEL, type AppNavigationApi } from '../shared/appNavigation'

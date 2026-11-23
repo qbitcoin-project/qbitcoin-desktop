@@ -5,7 +5,6 @@ import { app, clipboard } from 'electron'
 import { clearImportedKeyClipboard } from '../privacy/clipboard'
 import { btcEsploraDefaultsFor, BtcEsploraClient, ChainClient, nodesFor, type NodeEndpoint } from '@qbtc/chain'
 import { generateMnemonic, hash256, isSchnorrEnabled, masterKeyFromSeed, mnemonicToSeed, parseAccountXpub, toHex, validateMnemonic, type HDKey, type Network } from '@qbtc/crypto'
-import type { Vault } from '@qbtc/vault'
 import { RestorableVault } from './RestorableVault'
 import { addressFromPubkey, addressFromScripthash, addressFromXpub, decodeAddress, DOWNGRADE, exportAccountXpub, UPGRADE, validateAddress } from '../crypto'
 import { DELEGATE_PROFILES } from '../brand/delegation'
@@ -60,7 +59,10 @@ const AUTO_LOCK_MS = 5 * 60 * 1000
 
 export interface WalletCore {
   readonly cancelSensitiveScan: (sessionId: string) => void
-  readonly vault: Vault
+  readonly vault: RestorableVault
+  readonly vaultStorage: FileVaultStorage
+  readonly network: Network
+  readonly dataRoot: string
   readonly orchestrator: VaultOrchestrator
 }
 
@@ -105,7 +107,8 @@ export function createWalletCore(): WalletCore {
   // seals every wallet's at-rest stores; it lives at the default wallet's path and
   // outlives active-wallet switches. (v1: one seed wallet; watch wallets reuse this
   // key for their sealed public data.)
-  const vault = new RestorableVault(new FileVaultStorage(join(walletDir(userData, DEFAULT_WALLET_ID), 'vault.json')), { autoLockMs: AUTO_LOCK_MS, appDataInfo: PROFILE.appDataInfo })
+  const vaultStorage = new FileVaultStorage(join(walletDir(userData, DEFAULT_WALLET_ID), 'vault.json'))
+  const vault = new RestorableVault(vaultStorage, { autoLockMs: AUTO_LOCK_MS, appDataInfo: PROFILE.appDataInfo })
   const backup = new WalletBackupService(vault, registry, NETWORK, (id, file) => new FileVaultStorage(join(walletDir(userData, id), file)))
 
   // The public endpoints this build ships for its network (a brand value; may
@@ -1088,7 +1091,7 @@ export function createWalletCore(): WalletCore {
     },
   })
 
-  return { vault, orchestrator, cancelSensitiveScan: (sessionId: string) => sweepSlot.cancelPending(sessionId) }
+  return { vault, vaultStorage, dataRoot: userData, network: NETWORK, orchestrator, cancelSensitiveScan: (sessionId: string) => sweepSlot.cancelPending(sessionId) }
 }
 
 // A watch wallet has no keys: every send/sign path refuses.

@@ -1,4 +1,5 @@
-import { useState, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
+import { hasTouchIdEntry, refreshTouchId, useTouchIdStatus } from '../components/WalletTouchId'
 import { SensitiveContent, secretInputProps } from '../components/SensitiveContent'
 import { useSensitiveSession } from '../lib/useSensitiveSession'
 import { useOperation } from '../lib/useOperation'
@@ -10,16 +11,39 @@ import { Button, Logo, PasswordField, PasswordStrength, Screen, Subtitle, TextAr
 // main process auto-locks after inactivity. Unlocking is delegated to main. A "forgot
 // password" path re-creates the wallet from its recovery phrase + a new password: with
 // the same phrase this is non-destructive (the app-data key is seed-derived).
-export function Unlock({ onUnlocked }: { onUnlocked: () => void }) {
+export function Unlock({ onUnlocked }: { onUnlocked: (offer?: boolean) => void }) {
   const [view, setView] = useState<'unlock' | 'restore'>('unlock')
   const [restored, setRestored] = useState(false)
   return view === 'unlock' ? <UnlockForm restored={restored} onUnlocked={onUnlocked} onForgot={() => { setRestored(false); setView('restore') }} /> : <RestoreForm onRestored={() => { setRestored(true); setView('unlock') }} onBack={() => setView('unlock')} />
 }
 
-function UnlockForm({ onUnlocked, onForgot, restored }: { onUnlocked: () => void; onForgot: () => void; restored: boolean }) {
+function UnlockForm({ onUnlocked, onForgot, restored }: { onUnlocked: (offer?: boolean) => void; onForgot: () => void; restored: boolean }) {
   const [pw, setPw] = useState('')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const biometric = useTouchIdStatus()
+  const [method, setMethod] = useState<'automatic' | 'password' | 'failed'>('automatic')
+  // Once macOS takes over during lockout, follow its availability on return.
+  // An explicit password choice or a password already being typed stays put.
+  useEffect(() => {
+    if (method === 'failed' && biometric?.availability === 'lockout') setMethod('automatic')
+  }, [biometric?.availability, method])
+  const op = useOperation()
+  const pending = op.pending
+  useEffect(() => () => { if (pending.current) void window.walletTouchId?.cancel().catch(() => {}) }, [pending])
+  const offer = biometric?.enabled && biometric.availability === 'available' && !biometric.needsSetup && method === 'automatic'
+  async function touch(): Promise<void> {
+    if (!window.walletTouchId || !op.start()) return
+    setErrorMsg(null)
+    try {
+      const result = await window.walletTouchId.unlock()
+      if (!op.current()) return
+      if (result === 'unlocked') onUnlocked()
+      else if (result === 'password-required') setMethod('failed')
+    } catch {
+      if (op.current()) setMethod('failed')
+    } finally { op.finish(); refreshTouchId() }
+  }
 
   async function submit(): Promise<void> {
     if (busy || pw.length === 0) return
@@ -28,7 +52,10 @@ function UnlockForm({ onUnlocked, onForgot, restored }: { onUnlocked: () => void
     try {
       await wallet.unlock(pw)
       setPw('')
-      onUnlocked()
+      if (op.current()) {
+        const setup = await hasTouchIdEntry()
+        if (op.current()) onUnlocked(setup)
+      }
     } catch (e) {
       setErrorMsg(passwordError(e))
       setPw('')
@@ -44,14 +71,21 @@ function UnlockForm({ onUnlocked, onForgot, restored }: { onUnlocked: () => void
         <div style={{ marginTop: 18 }}>
           <Title>Welcome back</Title>
         </div>
-        <Subtitle>{restored ? 'Wallet restored. Enter your new password to unlock.' : 'Enter your password to unlock.'}</Subtitle>
+        <Subtitle>{offer ? 'Use Touch ID to unlock this wallet.' : restored ? 'Wallet restored. Enter your new password to unlock.' : 'Enter your password to unlock.'}</Subtitle>
+        {offer ? <div style={{ width: '100%', marginTop: 22 }}>
+          <Button fullWidth size="cta" disabled={op.busy} onClick={() => void touch()}>{op.busy ? 'Waiting for Touch ID…' : 'Unlock with Touch ID'}</Button>
+          <button type="button" style={linkButton} onClick={() => {
+            if (op.pending.current) void window.walletTouchId?.cancel().catch(() => {})
+            setErrorMsg(null); setMethod('password')
+          }}>Use password</button>
+        </div> : <>
         <div style={{ width: '100%', marginTop: 22, textAlign: 'left' }}>
           <TextField
             type="password"
             autoComplete="current-password"
             spellCheck={false}
             value={pw}
-            onChange={(e) => setPw(e.target.value)}
+            onChange={(e) => { setMethod('password'); setPw(e.target.value) }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.nativeEvent.isComposing) void submit()
             }}
@@ -69,6 +103,7 @@ function UnlockForm({ onUnlocked, onForgot, restored }: { onUnlocked: () => void
         <button type="button" disabled={busy} onClick={onForgot} style={linkButton}>
           Forgot password? Restore from recovery phrase
         </button>
+        </>}
       </div>
     </Screen>
   )

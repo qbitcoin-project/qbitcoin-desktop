@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { brand } from '../brand'
+import { hasTouchIdEntry } from '../components/WalletTouchId'
 import { RecoveryPhrase } from '../components/RecoveryPhrase'
 import { SensitiveContent, secretInputProps } from '../components/SensitiveContent'
 import { useSensitiveSession } from '../lib/useSensitiveSession'
@@ -22,7 +23,7 @@ function pickThree(count: number): number[] {
   return [...idx].sort((a, b) => a - b)
 }
 
-export function Onboarding({ onComplete }: { onComplete: () => void }) {
+export function Onboarding({ onComplete }: { onComplete: (offer?: boolean) => void }) {
   const [step, setStep] = useState<Step>('welcome')
   const [mode, setMode] = useState<Mode>('create')
   const [pw, setPw] = useState('')
@@ -83,7 +84,9 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
       if (!operation.current()) return
       clearDraft()
       access.controller.stop('completed')
-      setStep('done')
+      if (await hasTouchIdEntry()) {
+        if (operation.current()) onComplete(true)
+      } else if (operation.current()) setStep('done')
     } catch (e) {
       if (operation.current()) setError((e as Error).message)
     } finally {
@@ -181,10 +184,6 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                 I already have a wallet
               </Button>
             </div>
-            <p style={{ margin: '22px 0 0', fontSize: 12, color: 'var(--ink-500)', lineHeight: 1.5 }}>
-              By continuing you agree to our <span style={{ color: 'var(--ink-700)', textDecoration: 'underline' }}>Terms</span> and{' '}
-              <span style={{ color: 'var(--ink-700)', textDecoration: 'underline' }}>Privacy Policy</span>.
-            </p>
           </div>
         )}
 
@@ -314,7 +313,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
               <Title size={24}>You&apos;re all set</Title>
             </div>
             <Subtitle>Your wallet is ready — secured with Falcon-512 post-quantum keys.</Subtitle>
-            <Button fullWidth size="cta" onClick={onComplete} style={{ marginTop: 28 }}>
+            <Button fullWidth size="cta" onClick={() => onComplete()} style={{ marginTop: 28 }}>
               Open my wallet
             </Button>
           </div>

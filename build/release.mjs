@@ -176,7 +176,7 @@ function assertChangelog(state) {
 function sourceDigest(ref) {
   gitRoot()
   const names = (ref ? git('ls-tree', '-r', '--name-only', '-z', ref) : git('ls-files', '--cached', '--others', '--exclude-standard', '-z')).split('\0').filter(Boolean)
-  const inputs = [...new Set(names)].filter((name) => /^(src\/|build\/|resources\/|changes\/|\.github\/|package\.json$|pnpm-lock\.yaml$|release\.config\.json$|releases\/excluded-notes\.json$|[^/]+\.(?:ts|mjs|yml|yaml|json)$)/.test(name)).sort()
+  const inputs = [...new Set(names)].filter((name) => /^(src\/|native\/|build\/|resources\/|changes\/|\.github\/|package\.json$|pnpm-lock\.yaml$|release\.config\.json$|releases\/excluded-notes\.json$|[^/]+\.(?:ts|mjs|yml|yaml|json)$)/.test(name)).sort()
   const digest = createHash('sha256')
   for (const name of inputs) {
     if (!ref && !existsSync(filePath(name))) continue

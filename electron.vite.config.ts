@@ -1,5 +1,5 @@
 import { resolve } from 'node:path'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import type { Plugin } from 'vite'
@@ -9,6 +9,14 @@ import { version } from './package.json'
 import { loadBetaProfile } from './build/mac-beta.mjs'
 
 const beta = process.env.WALLET_TEST_BUILD === '1' ? loadBetaProfile(__dirname) : null
+const probe = process.env.TOUCH_ID_PROTOTYPE === '1'
+const wallet = process.env.TOUCH_ID_WALLET === '1'
+if ((probe || wallet) && !beta || (probe && wallet)) throw new Error('Select one Touch ID mode through the macOS beta build script.')
+const betaDir = wallet ? 'dist/touch-id-wallet' : probe ? 'dist/touch-id-app' : 'dist/beta-app'
+const identity = beta?.identity
+if (wallet && identity) identity.dataDirName = identity.dataDirName.replace(/-test$/, '-touch-id-test')
+const walletTouchId = beta ? wallet : existsSync(resolve(__dirname, 'build/brand/macos-wallet-touch-id.json'))
+const renderer = resolve(__dirname, probe ? 'src/renderer/touchId' : 'src/renderer')
 const changelog = parseChangelog(readFileSync(resolve(__dirname, 'CHANGELOG.md'), 'utf8'))
 
 // Bake the production CSP into the built index.html as a <meta> tag — the form
@@ -39,7 +47,7 @@ function injectCspMeta(): Plugin {
 // normal Vite + React app. The vault and crypto live in `main`.
 export default defineConfig({
   main: {
-    define: { __TEST_BUILD__: JSON.stringify(beta?.identity ?? null) },
+    define: { __TEST_BUILD__: JSON.stringify(identity ?? null), __WALLET_TOUCH_ID__: JSON.stringify(walletTouchId) },
     // Bundle the @qbtc/* packages into main rather than externalizing them:
     // they are pure ESM (the main bundle is CJS), bundling keeps a single copy
     // of @qbtc/crypto shared by the vault and our own code (so its error
@@ -48,26 +56,27 @@ export default defineConfig({
     // .wasm itself is located). Real npm deps stay external.
     plugins: [externalizeDepsPlugin({ exclude: ['@qbtc/crypto', '@qbtc/chain', '@qbtc/vault'] })],
     build: {
-      ...(beta ? { outDir: resolve(__dirname, 'dist/beta-app/main') } : {}),
-      rollupOptions: { input: { index: resolve(__dirname, 'src/main/index.ts') } },
+      ...(beta ? { outDir: resolve(__dirname, betaDir, 'main') } : {}),
+      rollupOptions: { input: { index: resolve(__dirname, probe ? 'src/main/touchId/index.ts' : 'src/main/index.ts') } },
     },
   },
   preload: {
+    define: { __WALLET_TOUCH_ID__: JSON.stringify(walletTouchId) },
     plugins: [externalizeDepsPlugin()],
     build: {
-      ...(beta ? { outDir: resolve(__dirname, 'dist/beta-app/preload') } : {}),
-      rollupOptions: { input: { index: resolve(__dirname, 'src/preload/index.ts') } },
+      ...(beta ? { outDir: resolve(__dirname, betaDir, 'preload') } : {}),
+      rollupOptions: { input: { index: resolve(__dirname, probe ? 'src/preload/touchIdProbe.ts' : 'src/preload/index.ts') } },
     },
   },
   renderer: {
-    root: resolve(__dirname, 'src/renderer'),
+    root: renderer,
     define: {
       __APP_VERSION__: JSON.stringify(beta?.version ?? version),
       __CHANGELOG__: JSON.stringify(beta ? [beta.notes, ...changelog] : changelog),
     },
     build: {
-      ...(beta ? { outDir: resolve(__dirname, 'dist/beta-app/renderer') } : {}),
-      rollupOptions: { input: { index: resolve(__dirname, 'src/renderer/index.html') } },
+      ...(beta ? { outDir: resolve(__dirname, betaDir, 'renderer') } : {}),
+      rollupOptions: { input: { index: resolve(renderer, 'index.html') } },
       assetsInlineLimit: 0,
     },
     plugins: [react(), injectCspMeta()],
